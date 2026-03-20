@@ -1343,6 +1343,35 @@ export default function Events({ role }: { role: Role }) {
     setIsManageOpen(true);
   };
 
+  const onDeleteEvent = (eventId: string) => {
+    const target = events.find((ev) => ev.id === eventId);
+    if (!target) return;
+
+    const confirmed = window.confirm(`ลบ Event \"${target.title}\" ใช่หรือไม่?`);
+    if (!confirmed) return;
+
+    setEvents((prev) => prev.filter((ev) => ev.id !== eventId));
+
+    setEquipmentByEvent((prev) => {
+      if (!(eventId in prev)) return prev;
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+
+    if (manageEventId === eventId) {
+      setIsManageOpen(false);
+      setManageEventId(null);
+    }
+
+    setCalendarDetail((prev) => {
+      if (!prev) return prev;
+      const nextEvents = prev.events.filter((ev) => ev.id !== eventId);
+      if (nextEvents.length === 0) return null;
+      return { ...prev, events: nextEvents };
+    });
+  };
+
   const activeEvent = useMemo(() => {
     if (!manageEventId) return null;
     return events.find((e) => e.id === manageEventId) ?? null;
@@ -1575,7 +1604,7 @@ export default function Events({ role }: { role: Role }) {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-400"
+              className="w-full bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-600"
               placeholder="ค้นหา Event ด้วย ชื่อ, บริษัท, ผู้จัด, สถานที่..."
             />
           </div>
@@ -1583,12 +1612,12 @@ export default function Events({ role }: { role: Role }) {
           <div ref={statusRef} className="relative md:w-[240px]">
             <button
               onClick={() => setIsStatusOpen((v) => !v)}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 shadow-sm hover:bg-zinc-50"
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-800 shadow-sm hover:bg-zinc-50"
             >
               <span
                 className={
                   statusFilter === "สถานะทั้งหมด"
-                    ? "text-zinc-500"
+                    ? "text-zinc-700"
                     : "text-zinc-800"
                 }
               >
@@ -1704,6 +1733,7 @@ export default function Events({ role }: { role: Role }) {
 
                   {role === "SA" && (
                     <button
+                      onClick={() => onDeleteEvent(e.id)}
                       className="rounded-2xl border border-red-200 bg-white p-2.5 text-red-600 shadow-sm hover:bg-red-50"
                       title="ลบ"
                     >
