@@ -589,7 +589,7 @@ export default function Stock({ role }: { role: Role }) {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-400"
+              className="w-full bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-600"
               placeholder="ค้นหาอุปกรณ์ด้วย ชื่อ, รหัส..."
             />
           </div>
