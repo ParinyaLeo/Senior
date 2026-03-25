@@ -25,6 +25,7 @@ import {
   Wallet,
   CalendarRange,
   ClipboardList,
+  Bell,
 } from "lucide-react";
 
 type Role = "SA" | "Manager" | "Stockkeeper";
@@ -60,6 +61,16 @@ type SelectedEquipment = {
   available: number;
   category: string;
   pricePerDayTHB: number;
+};
+
+type NotificationItem = {
+  id: string;
+  title: string;
+  message: string;
+  timeISO: string;
+  createdAt?: string;
+  audience: Role[];
+  unreadFor: Role[];
 };
 
 function StatCard({
@@ -161,6 +172,17 @@ function formatTHB(n: number) {
   return new Intl.NumberFormat("th-TH").format(n);
 }
 
+function formatDateTimeThai(iso: string) {
+  return new Date(iso).toLocaleString("th-TH", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 function getCalendarEventToneClass(tone: StatusTone) {
   if (tone === "pending") {
     return "border-l-amber-500 bg-amber-50 text-amber-700";
@@ -224,6 +246,117 @@ function Input({
   );
 }
 
+function CompanyDropdown({
+  label,
+  required,
+  value,
+  onChange,
+  placeholder,
+  options,
+  error,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  options: string[];
+  error?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!open) return;
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const needle = value.trim().toLowerCase();
+    if (!needle) return options;
+    return options.filter((opt) => opt.toLowerCase().includes(needle));
+  }, [options, value]);
+
+  const inputCls = [
+    "h-10 w-full rounded-xl border bg-zinc-50 px-3 pr-9 text-sm text-zinc-900 outline-none",
+    error
+      ? "border-red-300 ring-2 ring-red-100"
+      : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
+  ].join(" ");
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="mb-1 text-xs font-semibold text-zinc-700">
+        {label} {required ? <span className="text-red-600">*</span> : null}
+      </div>
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        type="text"
+        placeholder={placeholder}
+        className={inputCls}
+      />
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="absolute inset-y-0 right-2 grid place-items-center text-zinc-400 hover:text-zinc-600"
+        aria-label="Toggle company options"
+      >
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 rounded-xl border border-zinc-200 bg-white shadow-lg">
+          <div className="max-h-56 overflow-auto py-1">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-zinc-500">
+                No companies found
+              </div>
+            ) : (
+              filtered.map((opt) => (
+                <button
+                  type="button"
+                  key={opt}
+                  onClick={() => {
+                    onChange(opt);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50"
+                >
+                  <span className="truncate">{opt}</span>
+                  {opt === value ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  ) : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {error ? <div className="mt-1 text-xs text-red-600">{error}</div> : null}
+    </div>
+  );
+}
+
 function TextArea({
   label,
   value,
@@ -252,6 +385,7 @@ function CreateEventModal({
   open,
   onClose,
   onCreate,
+  companyOptions,
 }: {
   open: boolean;
   onClose: () => void;
@@ -267,6 +401,7 @@ function CreateEventModal({
     startDate: string;
     endDate: string;
   }) => void;
+  companyOptions: string[];
 }) {
   const [form, setForm] = useState<CreateForm>({
     eventName: "",
@@ -378,11 +513,13 @@ function CreateEventModal({
                 onChange={(v) => setForm((s) => ({ ...s, eventName: v }))}
                 error={errors.eventName}
               />
-              <Input
+              <CompanyDropdown
                 label="Company Name"
                 required
                 value={form.companyName}
                 onChange={(v) => setForm((s) => ({ ...s, companyName: v }))}
+                placeholder="Select or type a company"
+                options={companyOptions}
                 error={errors.companyName}
               />
             </div>
@@ -1503,6 +1640,10 @@ export default function Events({ role }: { role: Role }) {
   });
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  // bootstrap global notification store (shared with existing header bell)
+  // (No-op; notification persistence handled by backend Postgres)
 
   const STATUS_OPTIONS = useMemo(
     () => [
@@ -1588,6 +1729,38 @@ export default function Events({ role }: { role: Role }) {
       attendees: 60,
     },
   ]);
+
+  const companyOptions = useMemo(() => {
+    const names = Array.from(new Set(events.map((e) => e.company)));
+    return names.sort((a, b) => a.localeCompare(b));
+  }, [events]);
+
+  const pushNotification = (data: {
+    title: string;
+    message: string;
+    audience: Role[];
+  }) => {
+    fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("fail");
+        const r = await res.json();
+        const notif: NotificationItem = {
+          id: r.id,
+          createdAt: r.createdAt,
+          title: data.title,
+          message: data.message,
+          audience: data.audience,
+          unreadFor: data.audience,
+          timeISO: r.createdAt,
+        };
+        window.dispatchEvent(new CustomEvent("app:notification:new", { detail: notif }));
+      })
+      .catch(() => {});
+  };
 
   const stats = useMemo(() => {
     const total = events.length;
@@ -1705,7 +1878,7 @@ export default function Events({ role }: { role: Role }) {
     return max + 1;
   }, [events]);
 
-  const handleCreate = (payload: {
+  const handleCreate = async (payload: {
     title: string;
     company: string;
     organizer: string;
@@ -1739,9 +1912,22 @@ export default function Events({ role }: { role: Role }) {
 
     setEvents((prev) => [...prev, newEvent]);
     setView("list");
+    setToast(`สร้าง Event เรียบร้อย: "${payload.title}" (${dateRange})`);
+
+    if (role === "SA") {
+      fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Event ใหม่รออนุมัติ",
+          message: `${payload.title} สร้างโดย SA รอการอนุมัติ (${dateRange})`,
+          audience: ["Manager"],
+        }),
+      }).catch(() => {});
+    }
   };
 
-  const visibleEvents = useMemo(() => {
+const visibleEvents = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
     const filtered =
@@ -1824,12 +2010,42 @@ export default function Events({ role }: { role: Role }) {
   const todayKey = useMemo(() => toYMD(new Date()), []);
   const monthKey = (d: Date) => toYMD(d);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   return (
     <div className="px-6 py-8">
+      {toast && (
+        <div className="fixed right-6 top-6 z-[120]">
+          <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-3 shadow-lg">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-zinc-900">
+                สร้าง Event สำเร็จ
+              </div>
+              <div className="truncate text-xs text-zinc-600">{toast}</div>
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+              aria-label="ปิดแจ้งเตือน"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <CreateEventModal
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreate={handleCreate}
+        companyOptions={companyOptions}
       />
 
       {isManageOpen && (
@@ -1847,6 +2063,7 @@ export default function Events({ role }: { role: Role }) {
           }}
           onSaveApprove={({ startDate, endDate, equipment }) => {
             if (!manageEventId) return;
+            const targetEvent = events.find((ev) => ev.id === manageEventId);
 
             setEquipmentByEvent((prev) => ({ ...prev, [manageEventId]: equipment }));
 
@@ -1861,6 +2078,12 @@ export default function Events({ role }: { role: Role }) {
                 };
               })
             );
+
+            pushNotification({
+              title: "อนุมัติอุปกรณ์ Event",
+              message: `${targetEvent?.title ?? "Event"} อนุมัติรายการอุปกรณ์แล้ว`,
+              audience: ["SA", "Stockkeeper"],
+            });
           }}
         />
       )}
@@ -1908,7 +2131,7 @@ export default function Events({ role }: { role: Role }) {
         )}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+<div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (
           <StatCard
             key={s.label}
