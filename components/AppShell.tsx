@@ -15,7 +15,7 @@ import Events from "./pages/Events";
 import Stock from "./pages/Stock";
 import IssueReturn from "./pages/IssueReturn";
 import Reports from "./pages/Reports";
-import SettingsPage from "./pages/Settings"; // ✅ เพิ่มตัวนี้
+import SettingsPage from "./pages/Settings";
 
 export type Role = "SA" | "Manager" | "Stockkeeper";
 type Tab = "events" | "stock" | "issueReturn" | "reports" | "settings";
@@ -29,23 +29,104 @@ type NotificationItem = {
   audience: Role[];
 };
 
-const tabsByRole: Record<Role, { key: Tab; label: string; icon: React.ReactNode }[]> =
+// ✅ StockRow type และ seed data ย้ายมาไว้ที่นี่ เพื่อ share กับทั้ง Events และ Stock
+export type ItemStatus = "พร้อมใช้" | "ใช้งานอยู่" | "ซ่อมแซม";
+export type Category = "ไฟฟ้า" | "ผ้าใบ" | "ตกแต่ง";
+
+export type StockRow = {
+  id: string;
+  code: string;
+  name: string;
+  brand: string;
+  category: Category;
+  system: string;
+  zone: string;
+  status: ItemStatus;
+  qty: number;
+  available: number;
+  pricePerDay: number;
+  cost: number;
+};
+
+const initialStock: StockRow[] = [
   {
-    SA: [{ key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> }],
-    Manager: [
-      { key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> },
-      { key: "stock", label: "Stock", icon: <Boxes className="h-4 w-4" /> },
-      { key: "issueReturn", label: "Issue/Return", icon: <ArrowLeftRight className="h-4 w-4" /> },
-      { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
-      { key: "settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
-    ],
-    Stockkeeper: [
-      { key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> },
-      { key: "stock", label: "Stock", icon: <Boxes className="h-4 w-4" /> },
-      { key: "issueReturn", label: "Issue/Return", icon: <ArrowLeftRight className="h-4 w-4" /> },
-      { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
-    ],
-  };
+    id: "EQ001", code: "LT-1234", name: "ชุดไฟ LED หลากสี 200W",
+    brand: "PRO LIGHT", category: "ไฟฟ้า", system: "ระบบแสง", zone: "โซน A",
+    status: "พร้อมใช้", qty: 50, available: 50, pricePerDay: 800, cost: 15000,
+  },
+  {
+    id: "EQ002", code: "LT-5678", name: "ชุดไฟ Moving Head 300W",
+    brand: "STAGE PRO", category: "ไฟฟ้า", system: "ระบบแสง", zone: "โซน A",
+    status: "พร้อมใช้", qty: 30, available: 28, pricePerDay: 1500, cost: 45000,
+  },
+  {
+    id: "EQ003", code: "LT-9012", name: "ชุดไฟ Par Light LED RGB",
+    brand: "LIGHT MASTER", category: "ไฟฟ้า", system: "ระบบแสง", zone: "โซน A",
+    status: "พร้อมใช้", qty: 40, available: 35, pricePerDay: 600, cost: 12000,
+  },
+  {
+    id: "EQ004", code: "ST-0001", name: "เวทีขนาดเล็ก 2x2 เมตร",
+    brand: "STAGE TECH", category: "ผ้าใบ", system: "เวที", zone: "โซน B",
+    status: "พร้อมใช้", qty: 20, available: 20, pricePerDay: 1200, cost: 25000,
+  },
+  {
+    id: "EQ005", code: "ST-0002", name: "เวทีกลาง 4x4 เมตร",
+    brand: "STAGE TECH", category: "ผ้าใบ", system: "เวที", zone: "โซน B",
+    status: "พร้อมใช้", qty: 15, available: 12, pricePerDay: 2500, cost: 55000,
+  },
+  {
+    id: "EQ006", code: "ST-0003", name: "เวทีขนาดใหญ่ 6x8 เมตร",
+    brand: "STAGE TECH", category: "ผ้าใบ", system: "เวที", zone: "โซน B",
+    status: "พร้อมใช้", qty: 10, available: 8, pricePerDay: 5000, cost: 120000,
+  },
+  {
+    id: "EQ007", code: "GR-7890", name: "หญ้าเทียม (ม้วน 2x10 เมตร)",
+    brand: "GREEN GRASS", category: "ตกแต่ง", system: "ตกแต่ง", zone: "โซน C",
+    status: "พร้อมใช้", qty: 100, available: 85, pricePerDay: 300, cost: 3500,
+  },
+  {
+    id: "EQ008", code: "ST-0004", name: "โต๊ะพับหน้าไม้ 180cm",
+    brand: "FURNI PRO", category: "ตกแต่ง", system: "เฟอร์นิเจอร์", zone: "โซน C",
+    status: "พร้อมใช้", qty: 180, available: 180, pricePerDay: 80, cost: 1200,
+  },
+  {
+    id: "EQ009", code: "ST-0005", name: "เก้าอี้พลาสติก มีพนักพิง",
+    brand: "FURNI PRO", category: "ตกแต่ง", system: "เฟอร์นิเจอร์", zone: "โซน C",
+    status: "พร้อมใช้", qty: 420, available: 420, pricePerDay: 20, cost: 350,
+  },
+  {
+    id: "EQ010", code: "AU-0001", name: "เครื่องเสียง PA System 2000W",
+    brand: "SOUND MASTER", category: "ไฟฟ้า", system: "ระบบเสียง", zone: "โซน A",
+    status: "พร้อมใช้", qty: 18, available: 18, pricePerDay: 2000, cost: 85000,
+  },
+  {
+    id: "EQ011", code: "AU-0002", name: "ไมโครโฟนไร้สายคู่",
+    brand: "SOUND MASTER", category: "ไฟฟ้า", system: "ระบบเสียง", zone: "โซน A",
+    status: "พร้อมใช้", qty: 35, available: 35, pricePerDay: 600, cost: 8500,
+  },
+  {
+    id: "EQ012", code: "AV-0001", name: "โปรเจคเตอร์ 5000 Lumens",
+    brand: "VIEW PRO", category: "ไฟฟ้า", system: "ภาพ/โปรเจคเตอร์", zone: "โซน A",
+    status: "พร้อมใช้", qty: 22, available: 22, pricePerDay: 1200, cost: 35000,
+  },
+];
+
+const tabsByRole: Record<Role, { key: Tab; label: string; icon: React.ReactNode }[]> = {
+  SA: [{ key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> }],
+  Manager: [
+    { key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> },
+    { key: "stock", label: "Stock", icon: <Boxes className="h-4 w-4" /> },
+    { key: "issueReturn", label: "Issue/Return", icon: <ArrowLeftRight className="h-4 w-4" /> },
+    { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
+    { key: "settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
+  ],
+  Stockkeeper: [
+    { key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> },
+    { key: "stock", label: "Stock", icon: <Boxes className="h-4 w-4" /> },
+    { key: "issueReturn", label: "Issue/Return", icon: <ArrowLeftRight className="h-4 w-4" /> },
+    { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
+  ],
+};
 
 function LogoMark() {
   return (
@@ -53,7 +134,6 @@ function LogoMark() {
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-red-600 text-white shadow-sm">
         <span className="text-lg font-black">⬢</span>
       </div>
-
       <div className="leading-tight">
         <div className="text-base font-semibold text-zinc-900">Event Stock Manager</div>
         <div className="text-xs text-zinc-500">ระบบบริหารจัดการ Stock</div>
@@ -69,7 +149,6 @@ function RoleBadge({ role }: { role: Role }) {
       : role === "Manager"
       ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
       : "bg-violet-50 text-violet-700 ring-violet-100";
-
   return (
     <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${tone}`}>
       <span className="h-2 w-2 rounded-full bg-current opacity-70" />
@@ -87,9 +166,44 @@ export default function AppShell() {
   const [unread, setUnread] = useState(0);
   const notifRef = React.useRef<HTMLDivElement | null>(null);
 
+  // ✅ shared stock state — Events และ Stock ใช้ข้อมูลชุดเดียวกัน
+  const [stockData, setStockData] = useState<StockRow[]>(initialStock);
+
+  // ✅ function หักสต็อกเมื่ออนุมัติ Event
+  const deductStock = (equipmentList: { name: string; qty: number }[]) => {
+    setStockData((prev) =>
+      prev.map((row) => {
+        const match = equipmentList.find((eq) => eq.name === row.name);
+        if (!match) return row;
+        const newAvailable = Math.max(0, row.available - match.qty);
+        const inUse = row.qty - newAvailable;
+        return {
+          ...row,
+          available: newAvailable,
+          status: newAvailable === 0 ? "ใช้งานอยู่" : row.status,
+        };
+      })
+    );
+  };
+
+  // ✅ function คืนสต็อกเมื่อ Event ไม่อนุมัติ หรือคืนของ
+  const returnStock = (equipmentList: { name: string; qty: number }[]) => {
+    setStockData((prev) =>
+      prev.map((row) => {
+        const match = equipmentList.find((eq) => eq.name === row.name);
+        if (!match) return row;
+        const newAvailable = Math.min(row.qty, row.available + match.qty);
+        return {
+          ...row,
+          available: newAvailable,
+          status: newAvailable > 0 ? "พร้อมใช้" : row.status,
+        };
+      })
+    );
+  };
+
   const isSA = role === "SA";
 
-  // กันกรณีเปลี่ยน role แล้ว tab เดิมไม่มีใน role นั้น
   React.useEffect(() => {
     const allowed = tabsByRole[role].map((t) => t.key);
     if (!allowed.includes(tab)) setTab(allowed[0]);
@@ -159,10 +273,7 @@ export default function AppShell() {
           body: JSON.stringify({ role }),
         });
         setNotifList((prev) =>
-          prev.map((n) => ({
-            ...n,
-            unreadFor: n.unreadFor.filter((r) => r !== role),
-          }))
+          prev.map((n) => ({ ...n, unreadFor: n.unreadFor.filter((r) => r !== role) }))
         );
         setUnread(0);
       }
@@ -195,21 +306,17 @@ export default function AppShell() {
       {/* Topbar */}
       <div className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-4">
-          {/* Left */}
           <div className="shrink-0">
             <LogoMark />
           </div>
 
-          {/* Center (Tabs) -> ซ่อนเมื่อเป็น SA */}
           {!isSA && (
             <div className="hidden flex-1 items-center justify-center gap-2 md:flex">
               {tabs.map(renderTabButton)}
             </div>
           )}
 
-          {/* Right */}
           <div className="ml-auto flex shrink-0 items-center gap-3">
-            {/* ✅ SA: ให้ปุ่ม Events อยู่ "ข้างหน้า" badge สีฟ้า */}
             {isSA && (
               <div className="hidden items-center gap-2 md:flex">
                 {renderTabButton(tabsByRole.SA[0])}
@@ -296,11 +403,23 @@ export default function AppShell() {
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-2">
-        {tab === "events" && <Events role={role} />}
-        {tab === "stock" && <Stock role={role} />}
+        {tab === "events" && (
+          <Events
+            role={role}
+            stockData={stockData}
+            onDeductStock={deductStock}
+            onReturnStock={returnStock}
+          />
+        )}
+        {tab === "stock" && (
+          <Stock
+            role={role}
+            stockData={stockData}
+            onStockChange={setStockData}
+          />
+        )}
         {tab === "issueReturn" && <IssueReturn />}
         {tab === "reports" && <Reports />}
-        {/* ✅ Settings: ให้ Manager เท่านั้น */}
         {tab === "settings" && role === "Manager" && <SettingsPage />}
         {tab === "settings" && role !== "Manager" && (
           <div className="px-6 py-10 text-sm text-zinc-500">Manager Only</div>

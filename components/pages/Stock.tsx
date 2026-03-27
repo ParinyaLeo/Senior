@@ -16,9 +16,7 @@ import {
   X,
 } from "lucide-react";
 import type { Role } from "../AppShell";
-
-type ItemStatus = "พร้อมใช้" | "ใช้งานอยู่" | "ซ่อมแซม";
-type Category = "ไฟฟ้า" | "ผ้าใบ" | "ตกแต่ง";
+import type { StockRow, ItemStatus, Category } from "../AppShell";
 
 function Pill({
   children,
@@ -33,7 +31,6 @@ function Pill({
     amber: "bg-amber-100 text-amber-700 ring-1 ring-amber-200",
     zinc: "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200",
   } as const;
-
   return (
     <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${map[tone]}`}>
       {children}
@@ -58,7 +55,6 @@ function StatCard({
     violet: "bg-violet-100 text-violet-700",
     red: "bg-red-100 text-red-700",
   } as const;
-
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md">
       <div className="flex items-center gap-4">
@@ -73,122 +69,6 @@ function StatCard({
     </div>
   );
 }
-
-type StockRow = {
-  id: string;
-  code: string;
-  name: string;
-  brand: string;
-  category: Category;
-  system: string;
-  zone: string;
-  status: ItemStatus;
-  qty: number;
-  available: number;
-  pricePerDay: number;
-  cost: number;
-};
-
-const seed: StockRow[] = [
-  {
-    id: "EQ001",
-    code: "LT-1234",
-    name: "ชุดไฟ LED หลากสี 200W",
-    brand: "PRO LIGHT",
-    category: "ไฟฟ้า",
-    system: "ระบบแสง",
-    zone: "โซน A",
-    status: "พร้อมใช้",
-    qty: 50,
-    available: 50,
-    pricePerDay: 800,
-    cost: 15000,
-  },
-  {
-    id: "EQ002",
-    code: "LT-5678",
-    name: "ชุดไฟ Moving Head 300W",
-    brand: "STAGE PRO",
-    category: "ไฟฟ้า",
-    system: "ระบบแสง",
-    zone: "โซน A",
-    status: "พร้อมใช้",
-    qty: 30,
-    available: 28,
-    pricePerDay: 1500,
-    cost: 45000,
-  },
-  {
-    id: "EQ003",
-    code: "LT-9012",
-    name: "ชุดไฟ Par Light LED RGB",
-    brand: "LIGHT MASTER",
-    category: "ไฟฟ้า",
-    system: "ระบบแสง",
-    zone: "โซน A",
-    status: "พร้อมใช้",
-    qty: 40,
-    available: 35,
-    pricePerDay: 600,
-    cost: 12000,
-  },
-  {
-    id: "EQ004",
-    code: "ST-0001",
-    name: "เวทีขนาดเล็ก 2x2 เมตร",
-    brand: "STAGE TECH",
-    category: "ผ้าใบ",
-    system: "เวที",
-    zone: "โซน B",
-    status: "พร้อมใช้",
-    qty: 20,
-    available: 20,
-    pricePerDay: 1200,
-    cost: 25000,
-  },
-  {
-    id: "EQ005",
-    code: "ST-0002",
-    name: "เวทีกลาง 4x4 เมตร",
-    brand: "STAGE TECH",
-    category: "ผ้าใบ",
-    system: "เวที",
-    zone: "โซน B",
-    status: "พร้อมใช้",
-    qty: 15,
-    available: 12,
-    pricePerDay: 2500,
-    cost: 55000,
-  },
-  {
-    id: "EQ006",
-    code: "ST-0003",
-    name: "เวทีขนาดใหญ่ 6x8 เมตร",
-    brand: "STAGE TECH",
-    category: "ผ้าใบ",
-    system: "เวที",
-    zone: "โซน B",
-    status: "พร้อมใช้",
-    qty: 10,
-    available: 8,
-    pricePerDay: 5000,
-    cost: 120000,
-  },
-  {
-    id: "EQ007",
-    code: "GR-7890",
-    name: "หญ้าเทียม (ม้วน 2x10 เมตร)",
-    brand: "GREEN GRASS",
-    category: "ตกแต่ง",
-    system: "ตกแต่ง",
-    zone: "โซน C",
-    status: "พร้อมใช้",
-    qty: 100,
-    available: 85,
-    pricePerDay: 300,
-    cost: 3500,
-  },
-];
 
 function fmt(n: number) {
   return new Intl.NumberFormat("th-TH").format(n);
@@ -253,10 +133,8 @@ function AddStockModal({
     pricePerDay: "",
     cost: "",
   });
-
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // keep nextId in sync when modal opens
   React.useEffect(() => {
     if (!open) return;
     setForm((s) => ({ ...s, id: nextId }));
@@ -279,27 +157,23 @@ function AddStockModal({
     if (!form.brand.trim()) e.brand = "กรุณากรอกยี่ห้อ";
     if (!form.zone.trim()) e.zone = "กรุณาเลือกโซน";
     if (!form.qty.trim()) e.qty = "กรุณาระบุจำนวน";
-    if (form.qty.trim() && (Number.isNaN(Number(form.qty)) || Number(form.qty) <= 0)) e.qty = "จำนวนต้องเป็นตัวเลขมากกว่า 0";
+    if (form.qty.trim() && (Number.isNaN(Number(form.qty)) || Number(form.qty) <= 0))
+      e.qty = "จำนวนต้องเป็นตัวเลขมากกว่า 0";
     if (!form.pricePerDay.trim()) e.pricePerDay = "กรุณาระบุค่าเช่า/วัน";
     if (form.pricePerDay.trim() && (Number.isNaN(Number(form.pricePerDay)) || Number(form.pricePerDay) < 0))
       e.pricePerDay = "ค่าเช่าต้องเป็นตัวเลข";
     if (!form.cost.trim()) e.cost = "กรุณาระบุราคาต้นทุน";
-    if (form.cost.trim() && (Number.isNaN(Number(form.cost)) || Number(form.cost) < 0)) e.cost = "ราคาต้นทุนต้องเป็นตัวเลข";
+    if (form.cost.trim() && (Number.isNaN(Number(form.cost)) || Number(form.cost) < 0))
+      e.cost = "ราคาต้นทุนต้องเป็นตัวเลข";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const submit = () => {
     if (!validate()) return;
-
     const qty = Number(form.qty);
-    const pricePerDay = Number(form.pricePerDay);
-    const cost = Number(form.cost);
-
-    // code mock: สร้างรหัสอุปกรณ์ย่อยให้เหมือนในตาราง (ถ้าต้องการให้กรอกเอง บอกได้)
     const codePrefix = form.category === "ไฟฟ้า" ? "LT" : form.category === "ผ้าใบ" ? "ST" : "GR";
     const code = `${codePrefix}-${Math.floor(1000 + Math.random() * 9000)}`;
-
     onAdd({
       id: form.id.trim(),
       code,
@@ -311,10 +185,9 @@ function AddStockModal({
       status: form.status,
       qty,
       available: qty,
-      pricePerDay,
-      cost,
+      pricePerDay: Number(form.pricePerDay),
+      cost: Number(form.cost),
     });
-
     onClose();
   };
 
@@ -322,10 +195,7 @@ function AddStockModal({
 
   return (
     <div className="fixed inset-0 z-[120]">
-      {/* backdrop */}
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
-      {/* dialog */}
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-2xl">
           <div className="flex items-start justify-between gap-3 p-5">
@@ -333,37 +203,21 @@ function AddStockModal({
               <div className="text-lg font-semibold text-zinc-900">เพิ่มอุปกรณ์ใหม่</div>
               <div className="mt-1 text-sm text-zinc-500">กรอกข้อมูลอุปกรณ์</div>
             </div>
-
-            <button
-              onClick={onClose}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-              title="Close"
-            >
+            <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" title="Close">
               <X className="h-4 w-4" />
             </button>
           </div>
 
           <div className="px-5 pb-5">
-            {/* rows exactly 2 columns like screenshot */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="รหัส" required error={errors.id}>
-                <input
-                  value={form.id}
-                  onChange={(e) => setForm((s) => ({ ...s, id: e.target.value }))}
-                  placeholder="EQ-001"
-                  className={[
-                    "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                    errors.id ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                  ].join(" ")}
-                />
+                <input value={form.id} onChange={(e) => setForm((s) => ({ ...s, id: e.target.value }))} placeholder="EQ-001"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.id ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
               </Field>
 
               <Field label="สถานะ" required>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as ItemStatus }))}
-                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200"
-                >
+                <select value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as ItemStatus }))}
+                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200">
                   <option value="พร้อมใช้">พร้อมใช้</option>
                   <option value="ใช้งานอยู่">ใช้งานอยู่</option>
                   <option value="ซ่อมแซม">ซ่อมแซม</option>
@@ -371,35 +225,18 @@ function AddStockModal({
               </Field>
 
               <Field label="ชื่ออุปกรณ์" required error={errors.name}>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-                  placeholder="ชื่ออุปกรณ์"
-                  className={[
-                    "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                    errors.name ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                  ].join(" ")}
-                />
+                <input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="ชื่ออุปกรณ์"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.name ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
               </Field>
 
               <Field label="ยี่ห้อ" required error={errors.brand}>
-                <input
-                  value={form.brand}
-                  onChange={(e) => setForm((s) => ({ ...s, brand: e.target.value }))}
-                  placeholder="ยี่ห้อ"
-                  className={[
-                    "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                    errors.brand ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                  ].join(" ")}
-                />
+                <input value={form.brand} onChange={(e) => setForm((s) => ({ ...s, brand: e.target.value }))} placeholder="ยี่ห้อ"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.brand ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
               </Field>
 
               <Field label="โซน" required error={errors.zone}>
-                <select
-                  value={form.zone}
-                  onChange={(e) => setForm((s) => ({ ...s, zone: e.target.value }))}
-                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200"
-                >
+                <select value={form.zone} onChange={(e) => setForm((s) => ({ ...s, zone: e.target.value }))}
+                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200">
                   <option value="โซน A">โซน A</option>
                   <option value="โซน B">โซน B</option>
                   <option value="โซน C">โซน C</option>
@@ -407,11 +244,8 @@ function AddStockModal({
               </Field>
 
               <Field label="ประเภท" required>
-                <select
-                  value={form.category}
-                  onChange={(e) => setForm((s) => ({ ...s, category: e.target.value as Category }))}
-                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200"
-                >
+                <select value={form.category} onChange={(e) => setForm((s) => ({ ...s, category: e.target.value as Category }))}
+                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200">
                   <option value="ไฟฟ้า">ไฟฟ้า</option>
                   <option value="ผ้าใบ">ผ้าใบ</option>
                   <option value="ตกแต่ง">ตกแต่ง</option>
@@ -419,66 +253,29 @@ function AddStockModal({
               </Field>
 
               <Field label="จำนวน" required error={errors.qty}>
-                <input
-                  value={form.qty}
-                  onChange={(e) => setForm((s) => ({ ...s, qty: e.target.value }))}
-                  placeholder="ระบุจำนวน"
-                  className={[
-                    "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                    errors.qty ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                  ].join(" ")}
-                />
+                <input value={form.qty} onChange={(e) => setForm((s) => ({ ...s, qty: e.target.value }))} placeholder="ระบุจำนวน"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.qty ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
               </Field>
 
               <Field label="ค่าเช่า/วัน (บาท)" required error={errors.pricePerDay}>
-                <input
-                  value={form.pricePerDay}
-                  onChange={(e) => setForm((s) => ({ ...s, pricePerDay: e.target.value }))}
-                  placeholder="ระบุค่าเช่าต่อวัน"
-                  className={[
-                    "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                    errors.pricePerDay
-                      ? "border-red-300 ring-2 ring-red-100"
-                      : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                  ].join(" ")}
-                />
+                <input value={form.pricePerDay} onChange={(e) => setForm((s) => ({ ...s, pricePerDay: e.target.value }))} placeholder="ระบุค่าเช่าต่อวัน"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.pricePerDay ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
               </Field>
 
               <Field label="ราคาต้นทุน (บาท)" required error={errors.cost}>
-                <input
-                  value={form.cost}
-                  onChange={(e) => setForm((s) => ({ ...s, cost: e.target.value }))}
-                  placeholder="ระบุราคาต้นทุน"
-                  className={[
-                    "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                    errors.cost ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                  ].join(" ")}
-                />
+                <input value={form.cost} onChange={(e) => setForm((s) => ({ ...s, cost: e.target.value }))} placeholder="ระบุราคาต้นทุน"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.cost ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
               </Field>
 
               <Field label="หมวดหมู่" required>
-                <input
-                  value={form.typeLabel}
-                  onChange={(e) => setForm((s) => ({ ...s, typeLabel: e.target.value }))}
-                  placeholder="เช่น โปรเจคเตอร์, ไมค์, เครื่องเสียง"
-                  className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200"
-                />
+                <input value={form.typeLabel} onChange={(e) => setForm((s) => ({ ...s, typeLabel: e.target.value }))} placeholder="เช่น โปรเจคเตอร์, ไมค์, เครื่องเสียง"
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200" />
               </Field>
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                onClick={onClose}
-                className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={submit}
-                className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-              >
-                เพิ่ม
-              </button>
+              <button onClick={onClose} className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">ยกเลิก</button>
+              <button onClick={submit} className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">เพิ่ม</button>
             </div>
           </div>
         </div>
@@ -487,62 +284,73 @@ function AddStockModal({
   );
 }
 
-export default function Stock({ role }: { role: Role }) {
+// ✅ รับ stockData และ onStockChange จาก AppShell
+export default function Stock({
+  role,
+  stockData,
+  onStockChange,
+}: {
+  role: Role;
+  stockData: StockRow[];
+  onStockChange: (updater: StockRow[] | ((prev: StockRow[]) => StockRow[])) => void;
+}) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"ทั้งหมด" | ItemStatus>("ทั้งหมด");
   const [category, setCategory] = useState<"ทั้งหมด" | Category>("ทั้งหมด");
-
-  // ✅ เปลี่ยนจาก seed ตรงๆ เป็น state เพื่อ “เพิ่มได้จริง”
-  const [data, setData] = useState<StockRow[]>(seed);
-
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   const rows = useMemo(() => {
-    return data.filter((r) => {
+    return stockData.filter((r) => {
       const hitQ =
         q.trim().length === 0 ||
-        [r.id, r.code, r.name, r.brand, r.system, r.zone].some((x) => x.toLowerCase().includes(q.toLowerCase()));
+        [r.id, r.code, r.name, r.brand, r.system, r.zone].some((x) =>
+          x.toLowerCase().includes(q.toLowerCase())
+        );
       const hitStatus = status === "ทั้งหมด" || r.status === status;
       const hitCat = category === "ทั้งหมด" || r.category === category;
       return hitQ && hitStatus && hitCat;
     });
-  }, [q, status, category, data]);
+  }, [q, status, category, stockData]);
 
+  // ✅ stats คำนวณจาก stockData จริง
   const stats = useMemo(() => {
-    const total = 1900;
-    const ready = 1658;
-    const inUse = 242;
-    const repair = 0;
+    const total = stockData.reduce((s, r) => s + r.qty, 0);
+    const ready = stockData.reduce((s, r) => s + r.available, 0);
+    const inUse = stockData.reduce((s, r) => s + (r.qty - r.available), 0);
+    const repair = stockData.filter((r) => r.status === "ซ่อมแซม").length;
     return { total, ready, inUse, repair };
-  }, []);
+  }, [stockData]);
 
   const showEdit = role !== "SA";
   const showDelete = role === "Manager";
 
-  // ✅ สร้าง next EQ id (EQ-001 style ใน modal)
   const nextId = useMemo(() => {
     let max = 0;
-    for (const r of data) {
+    for (const r of stockData) {
       const m = r.id.match(/^EQ(\d+)$/);
       if (m) max = Math.max(max, Number(m[1]));
     }
-    const next = max + 1;
-    return `EQ-${String(next).padStart(3, "0")}`;
-  }, [data]);
+    return `EQ-${String(max + 1).padStart(3, "0")}`;
+  }, [stockData]);
+
+  const handleAdd = (row: StockRow) => {
+    const normalizedId = row.id.replace("-", "");
+    onStockChange((prev) => [{ ...row, id: normalizedId }, ...prev]);
+    setIsAddOpen(false);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!window.confirm("ต้องการลบอุปกรณ์นี้ใช่หรือไม่?")) return;
+    onStockChange((prev) => prev.filter((r) => r.id !== id));
+  };
 
   return (
     <div className="px-6 py-8">
-      {/* ✅ Modal */}
       <AddStockModal
         open={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         nextId={nextId}
-        onAdd={(row) => {
-          // convert EQ-001 -> EQ001 for table pill style (optional)
-          const normalizedId = row.id.replace("-", "");
-          setData((prev) => [{ ...row, id: normalizedId }, ...prev]);
-          setIsAddOpen(false);
-        }}
+        onAdd={handleAdd}
       />
 
       {/* Header */}
@@ -562,7 +370,6 @@ export default function Stock({ role }: { role: Role }) {
             <Download className="h-4 w-4" />
             ส่งออก Excel
           </button>
-
           <button
             onClick={() => setIsAddOpen(true)}
             className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
@@ -573,7 +380,7 @@ export default function Stock({ role }: { role: Role }) {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* ✅ Stats คำนวณจาก stockData จริง */}
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={<Package className="h-5 w-5" />} value={stats.total} label="รวมทั้งหมด" tone="neutral" />
         <StatCard icon={<CheckCircle2 className="h-5 w-5" />} value={stats.ready} label="พร้อมใช้" tone="emerald" />
@@ -595,11 +402,8 @@ export default function Stock({ role }: { role: Role }) {
           </div>
 
           <div className="relative md:w-[220px]">
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
-              className="h-[52px] w-full appearance-none rounded-2xl border border-zinc-200 bg-white px-4 pr-10 text-sm font-semibold text-zinc-800 shadow-sm outline-none hover:bg-zinc-50"
-            >
+            <select value={status} onChange={(e) => setStatus(e.target.value as any)}
+              className="h-[52px] w-full appearance-none rounded-2xl border border-zinc-200 bg-white px-4 pr-10 text-sm font-semibold text-zinc-800 shadow-sm outline-none hover:bg-zinc-50">
               <option value="ทั้งหมด">สถานะทั้งหมด</option>
               <option value="พร้อมใช้">พร้อมใช้</option>
               <option value="ใช้งานอยู่">ใช้งานอยู่</option>
@@ -609,11 +413,8 @@ export default function Stock({ role }: { role: Role }) {
           </div>
 
           <div className="relative md:w-[220px]">
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as any)}
-              className="h-[52px] w-full appearance-none rounded-2xl border border-zinc-200 bg-white px-4 pr-10 text-sm font-semibold text-zinc-800 shadow-sm outline-none hover:bg-zinc-50"
-            >
+            <select value={category} onChange={(e) => setCategory(e.target.value as any)}
+              className="h-[52px] w-full appearance-none rounded-2xl border border-zinc-200 bg-white px-4 pr-10 text-sm font-semibold text-zinc-800 shadow-sm outline-none hover:bg-zinc-50">
               <option value="ทั้งหมด">ประเภททั้งหมด</option>
               <option value="ไฟฟ้า">ไฟฟ้า</option>
               <option value="ผ้าใบ">ผ้าใบ</option>
@@ -625,7 +426,7 @@ export default function Stock({ role }: { role: Role }) {
       </div>
 
       <div className="mt-5 text-sm text-zinc-500">
-        แสดง {rows.length} จาก {data.length} รายการ
+        แสดง {rows.length} จาก {stockData.length} รายการ
       </div>
 
       {/* Table */}
@@ -642,16 +443,14 @@ export default function Stock({ role }: { role: Role }) {
                 <th className="px-6 py-4">สถานะ</th>
                 <th className="px-6 py-4 text-center">จำนวน</th>
                 <th className="px-6 py-4 text-center">ค่าเช่า/วัน</th>
-                <th className="px-6 py-4 text-center">ราคา ต้นทุน</th>
+                <th className="px-6 py-4 text-center">ราคาต้นทุน</th>
                 <th className="px-6 py-4 text-center">จัดการ</th>
               </tr>
             </thead>
-
             <tbody className="text-sm text-zinc-800">
               {rows.map((r, idx) => {
-                const catTone = r.category === "ไฟฟ้า" ? "amber" : r.category === "ผ้าใบ" ? "zinc" : "zinc";
+                const catTone = r.category === "ไฟฟ้า" ? "amber" : "zinc";
                 const statusTone = r.status === "พร้อมใช้" ? "green" : r.status === "ใช้งานอยู่" ? "blue" : "amber";
-
                 return (
                   <tr key={`${r.id}-${idx}`} className={idx % 2 ? "bg-zinc-50/30" : "bg-white"}>
                     <td className="px-6 py-5">
@@ -660,57 +459,42 @@ export default function Stock({ role }: { role: Role }) {
                         <Pill tone="blue">{r.code}</Pill>
                       </div>
                     </td>
-
                     <td className="px-6 py-5">
                       <div className="font-semibold text-zinc-900">{r.name}</div>
                     </td>
-
                     <td className="px-6 py-5">{r.brand}</td>
-
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
                         <Pill tone={catTone as any}>{r.category}</Pill>
                         <span className="text-zinc-500">{r.system}</span>
                       </div>
                     </td>
-
                     <td className="px-6 py-5">
                       <Pill tone="blue">{r.zone}</Pill>
                     </td>
-
                     <td className="px-6 py-5">
                       <Pill tone={statusTone as any}>{r.status}</Pill>
                     </td>
-
                     <td className="px-6 py-5 text-center">
+                      {/* ✅ แสดง available ที่อัปเดตแล้ว */}
                       <div className="font-semibold">{fmt(r.qty)}</div>
                       <div className="text-xs text-zinc-500">({fmt(r.available)} พร้อมใช้)</div>
                     </td>
-
                     <td className="px-6 py-5 text-center">{fmt(r.pricePerDay)} ฿</td>
-
                     <td className="px-6 py-5 text-center">{fmt(r.cost)} ฿</td>
-
                     <td className="px-6 py-5">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50"
-                          title="ดู"
-                        >
+                        <button className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50" title="ดู">
                           <Eye className="h-4 w-4" />
                         </button>
-
                         {showEdit && (
-                          <button
-                            className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50"
-                            title="แก้ไข"
-                          >
+                          <button className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50" title="แก้ไข">
                             <Pencil className="h-4 w-4" />
                           </button>
                         )}
-
                         {showDelete && (
                           <button
+                            onClick={() => handleDelete(r.id)}
                             className="grid h-9 w-9 place-items-center rounded-2xl border border-red-200 bg-white text-red-600 shadow-sm hover:bg-red-50"
                             title="ลบ"
                           >
@@ -726,7 +510,6 @@ export default function Stock({ role }: { role: Role }) {
           </table>
         </div>
       </div>
-
       <div className="h-10" />
     </div>
   );
