@@ -764,8 +764,26 @@ export default function Events({
   const visibleEvents = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     const filtered = statusFilter === "สถานะทั้งหมด" ? events : events.filter((e) => e.status.text === statusFilter);
-    if (!keyword) return filtered;
-    return filtered.filter((e) => [e.title, e.company, e.place, e.desc, e.organizer ?? "", e.code].join(" ").toLowerCase().includes(keyword));
+    const searched = !keyword
+      ? filtered
+      : filtered.filter((e) =>
+          [e.title, e.company, e.place, e.desc, e.organizer ?? "", e.code]
+            .join(" ")
+            .toLowerCase()
+            .includes(keyword),
+        );
+
+    return [...searched].sort((a, b) => {
+      const aStart = toDateLocal(parseDateRange(a.date).startStr).getTime();
+      const bStart = toDateLocal(parseDateRange(b.date).startStr).getTime();
+      if (aStart !== bStart) return aStart - bStart;
+
+      const aEnd = toDateLocal(parseDateRange(a.date).endStr).getTime();
+      const bEnd = toDateLocal(parseDateRange(b.date).endStr).getTime();
+      if (aEnd !== bEnd) return aEnd - bEnd;
+
+      return a.id.localeCompare(b.id);
+    });
   }, [events, statusFilter, search]);
 
   const eventsByDay = useMemo(() => {
