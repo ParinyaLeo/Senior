@@ -141,6 +141,17 @@ function parseDateRange(range: string) {
   return { startStr, endStr };
 }
 
+function parseDateTimeForSort(value: string) {
+  const normalized = value.trim().replace(" ", "T");
+  const parsed = Date.parse(normalized);
+  if (!Number.isNaN(parsed)) return parsed;
+
+  const ymd = value.trim().match(/^\d{4}-\d{2}-\d{2}$/);
+  if (ymd) return toDateLocal(value.trim()).getTime();
+
+  return Number.POSITIVE_INFINITY;
+}
+
 function DayLegendDot({ cls, label }: { cls: string; label: string }) {
   return (
     <div className="flex items-center gap-2 text-sm text-zinc-600">
@@ -1435,9 +1446,9 @@ export default function Events({ role }: { role: Role }) {
         ? events
         : events.filter((e) => e.status.text === statusFilter);
 
-    if (!keyword) return filtered;
-
-    return filtered.filter((e) => {
+    const filteredByKeyword = !keyword
+      ? filtered
+      : filtered.filter((e) => {
       const haystack = [
         e.title,
         e.company,
@@ -1450,6 +1461,23 @@ export default function Events({ role }: { role: Role }) {
         .toLowerCase();
 
       return haystack.includes(keyword);
+    });
+
+    return [...filteredByKeyword].sort((a, b) => {
+      const aRange = parseDateRange(a.date);
+      const bRange = parseDateRange(b.date);
+
+      const startDiff =
+        parseDateTimeForSort(aRange.startStr) -
+        parseDateTimeForSort(bRange.startStr);
+      if (startDiff !== 0) return startDiff;
+
+      const endDiff =
+        parseDateTimeForSort(aRange.endStr) -
+        parseDateTimeForSort(bRange.endStr);
+      if (endDiff !== 0) return endDiff;
+
+      return a.id.localeCompare(b.id);
     });
   }, [events, statusFilter, search]);
 
