@@ -74,6 +74,142 @@ function fmt(n: number) {
   return new Intl.NumberFormat("th-TH").format(n);
 }
 
+/** ========= Modal: Stock Detail ========= */
+function StockDetailModal({
+  item,
+  onClose,
+}: {
+  item: StockRow | null;
+  onClose: () => void;
+}) {
+  if (!item) return null;
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const statusTone = item.status === "พร้อมใช้" ? "green" : item.status === "ใช้งานอยู่" ? "blue" : "amber";
+  const catTone = item.category === "ไฟฟ้า" ? "amber" : "zinc";
+
+  return (
+    <div className="fixed inset-0 z-[120]">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-3 p-5">
+            <div>
+              <div className="text-lg font-semibold text-zinc-900">รายละเอียดอุปกรณ์</div>
+              <div className="mt-1 text-sm text-zinc-500">{item.name}</div>
+            </div>
+            <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" title="Close">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="px-5 pb-5">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* ID */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">รหัสอุปกรณ์</div>
+                  <div className="flex items-center gap-2">
+                    <Pill tone="blue">{item.id}</Pill>
+                    <Pill tone="blue">{item.code}</Pill>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">สถานะ</div>
+                  <Pill tone={statusTone as any}>{item.status}</Pill>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">ชื่ออุปกรณ์</div>
+                  <div className="font-semibold text-zinc-900">{item.name}</div>
+                </div>
+
+                {/* Brand */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">ยี่ห้อ</div>
+                  <div className="text-zinc-800">{item.brand}</div>
+                </div>
+
+                {/* Category */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">ประเภท</div>
+                  <div className="flex items-center gap-2">
+                    <Pill tone={catTone as any}>{item.category}</Pill>
+                    <span className="text-zinc-500">{item.system}</span>
+                  </div>
+                </div>
+
+                {/* Zone */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">โซนจัดเก็บ</div>
+                  <Pill tone="blue">{item.zone}</Pill>
+                </div>
+
+                {/* Quantity */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">จำนวนรวม</div>
+                  <div className="text-lg font-semibold text-zinc-900">{fmt(item.qty)} ยูนิต</div>
+                </div>
+
+                {/* Available */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">จำนวนพร้อมใช้</div>
+                  <div className="text-lg font-semibold text-emerald-600">{fmt(item.available)} ยูนิต</div>
+                </div>
+
+                {/* Price Per Day */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">ค่าเช่า/วัน</div>
+                  <div className="text-lg font-semibold text-zinc-900">{fmt(item.pricePerDay)} ฿</div>
+                </div>
+
+                {/* Cost */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold text-zinc-500">ราคาต้นทุน</div>
+                  <div className="text-lg font-semibold text-zinc-900">{fmt(item.cost)} ฿</div>
+                </div>
+              </div>
+
+              {/* Usage Summary */}
+              <div className="rounded-xl bg-zinc-50 p-4">
+                <div className="mb-3 text-xs font-semibold text-zinc-700">สรุปการใช้งาน</div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <div className="text-2xl font-bold text-zinc-900">{fmt(item.available)}</div>
+                    <div className="text-xs text-zinc-500">พร้อมใช้</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-violet-600">{fmt(item.qty - item.available)}</div>
+                    <div className="text-xs text-zinc-500">ใช้งานอยู่</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-zinc-900">{fmt(item.qty)}</div>
+                    <div className="text-xs text-zinc-500">รวมทั้งหมด</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button onClick={onClose} className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">ปิด</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** ========= Modal: Add New Stock ========= */
 type AddForm = {
   id: string;
@@ -284,6 +420,210 @@ function AddStockModal({
   );
 }
 
+/** ========= Modal: Edit Stock ========= */
+type EditForm = {
+  status: ItemStatus;
+  name: string;
+  brand: string;
+  category: Category;
+  typeLabel: string;
+  zone: string;
+  qty: string;
+  available: string;
+  pricePerDay: string;
+  cost: string;
+};
+
+function EditStockModal({
+  open,
+  item,
+  onClose,
+  onUpdate,
+}: {
+  open: boolean;
+  item: StockRow | null;
+  onClose: () => void;
+  onUpdate: (updatedItem: StockRow) => void;
+}) {
+  const [form, setForm] = useState<EditForm>({
+    status: "พร้อมใช้",
+    name: "",
+    brand: "",
+    category: "ไฟฟ้า",
+    typeLabel: "อุปกรณ์ทั่วไป",
+    zone: "โซน A",
+    qty: "",
+    available: "",
+    pricePerDay: "",
+    cost: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    if (!open || !item) return;
+    setForm({
+      status: item.status,
+      name: item.name,
+      brand: item.brand,
+      category: item.category,
+      typeLabel: item.system,
+      zone: item.zone,
+      qty: String(item.qty),
+      available: String(item.available),
+      pricePerDay: String(item.pricePerDay),
+      cost: String(item.cost),
+    });
+    setErrors({});
+  }, [open, item]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = "กรุณากรอกชื่ออุปกรณ์";
+    if (!form.brand.trim()) e.brand = "กรุณากรอกยี่ห้อ";
+    if (!form.zone.trim()) e.zone = "กรุณาเลือกโซน";
+    if (!form.qty.trim()) e.qty = "กรุณาระบุจำนวน";
+    if (form.qty.trim() && (Number.isNaN(Number(form.qty)) || Number(form.qty) <= 0))
+      e.qty = "จำนวนต้องเป็นตัวเลขมากกว่า 0";
+    if (!form.available.trim()) e.available = "กรุณาระบุจำนวนพร้อมใช้";
+    if (form.available.trim() && (Number.isNaN(Number(form.available)) || Number(form.available) < 0))
+      e.available = "จำนวนพร้อมใช้ต้องเป็นตัวเลข";
+    if (form.available.trim() && form.qty.trim() && Number(form.available) > Number(form.qty))
+      e.available = "จำนวนพร้อมใช้ต้องไม่เกินจำนวนรวม";
+    if (!form.pricePerDay.trim()) e.pricePerDay = "กรุณาระบุค่าเช่า/วัน";
+    if (form.pricePerDay.trim() && (Number.isNaN(Number(form.pricePerDay)) || Number(form.pricePerDay) < 0))
+      e.pricePerDay = "ค่าเช่าต้องเป็นตัวเลข";
+    if (!form.cost.trim()) e.cost = "กรุณาระบุราคาต้นทุน";
+    if (form.cost.trim() && (Number.isNaN(Number(form.cost)) || Number(form.cost) < 0))
+      e.cost = "ราคาต้นทุนต้องเป็นตัวเลข";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const submit = () => {
+    if (!validate() || !item) return;
+    onUpdate({
+      ...item,
+      name: form.name.trim(),
+      brand: form.brand.trim(),
+      category: form.category,
+      system: form.typeLabel.trim(),
+      zone: form.zone,
+      status: form.status,
+      qty: Number(form.qty),
+      available: Number(form.available),
+      pricePerDay: Number(form.pricePerDay),
+      cost: Number(form.cost),
+    });
+    onClose();
+  };
+
+  if (!open || !item) return null;
+
+  return (
+    <div className="fixed inset-0 z-[120]">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-3 p-5">
+            <div>
+              <div className="text-lg font-semibold text-zinc-900">แก้ไขอุปกรณ์</div>
+              <div className="mt-1 text-sm text-zinc-500">{item.name}</div>
+            </div>
+            <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" title="Close">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="รหัส" required>
+                <input disabled value={item.id} placeholder="EQ-001"
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3 text-sm text-zinc-500 outline-none" />
+              </Field>
+
+              <Field label="สถานะ" required>
+                <select value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as ItemStatus }))}
+                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200">
+                  <option value="พร้อมใช้">พร้อมใช้</option>
+                  <option value="ใช้งานอยู่">ใช้งานอยู่</option>
+                  <option value="ซ่อมแซม">ซ่อมแซม</option>
+                </select>
+              </Field>
+
+              <Field label="ชื่ออุปกรณ์" required error={errors.name}>
+                <input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="ชื่ออุปกรณ์"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.name ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+              </Field>
+
+              <Field label="ยี่ห้อ" required error={errors.brand}>
+                <input value={form.brand} onChange={(e) => setForm((s) => ({ ...s, brand: e.target.value }))} placeholder="ยี่ห้อ"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.brand ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+              </Field>
+
+              <Field label="โซน" required error={errors.zone}>
+                <select value={form.zone} onChange={(e) => setForm((s) => ({ ...s, zone: e.target.value }))}
+                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200">
+                  <option value="โซน A">โซน A</option>
+                  <option value="โซน B">โซน B</option>
+                  <option value="โซน C">โซน C</option>
+                </select>
+              </Field>
+
+              <Field label="ประเภท" required>
+                <select value={form.category} onChange={(e) => setForm((s) => ({ ...s, category: e.target.value as Category }))}
+                  className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200">
+                  <option value="ไฟฟ้า">ไฟฟ้า</option>
+                  <option value="ผ้าใบ">ผ้าใบ</option>
+                  <option value="ตกแต่ง">ตกแต่ง</option>
+                </select>
+              </Field>
+
+              <Field label="จำนวนรวม" required error={errors.qty}>
+                <input value={form.qty} onChange={(e) => setForm((s) => ({ ...s, qty: e.target.value }))} placeholder="ระบุจำนวน"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.qty ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+              </Field>
+
+              <Field label="จำนวนพร้อมใช้" required error={errors.available}>
+                <input value={form.available} onChange={(e) => setForm((s) => ({ ...s, available: e.target.value }))} placeholder="ระบุจำนวนพร้อมใช้"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.available ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+              </Field>
+
+              <Field label="ค่าเช่า/วัน (บาท)" required error={errors.pricePerDay}>
+                <input value={form.pricePerDay} onChange={(e) => setForm((s) => ({ ...s, pricePerDay: e.target.value }))} placeholder="ระบุค่าเช่าต่อวัน"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.pricePerDay ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+              </Field>
+
+              <Field label="ราคาต้นทุน (บาท)" required error={errors.cost}>
+                <input value={form.cost} onChange={(e) => setForm((s) => ({ ...s, cost: e.target.value }))} placeholder="ระบุราคาต้นทุน"
+                  className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.cost ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+              </Field>
+
+              <Field label="หมวดหมู่" required>
+                <input value={form.typeLabel} onChange={(e) => setForm((s) => ({ ...s, typeLabel: e.target.value }))} placeholder="เช่น โปรเจคเตอร์, ไมค์, เครื่องเสียง"
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200" />
+              </Field>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button onClick={onClose} className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">ยกเลิก</button>
+              <button onClick={submit} className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">บันทึก</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ✅ รับ stockData และ onStockChange จาก AppShell
 export default function Stock({
   role,
@@ -298,6 +638,8 @@ export default function Stock({
   const [status, setStatus] = useState<"ทั้งหมด" | ItemStatus>("ทั้งหมด");
   const [category, setCategory] = useState<"ทั้งหมด" | Category>("ทั้งหมด");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<StockRow | null>(null);
+  const [editItem, setEditItem] = useState<StockRow | null>(null);
 
   const rows = useMemo(() => {
     return stockData.filter((r) => {
@@ -342,6 +684,11 @@ export default function Stock({
   const handleDelete = (id: string) => {
     if (!window.confirm("ต้องการลบอุปกรณ์นี้ใช่หรือไม่?")) return;
     onStockChange((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleUpdate = (updatedItem: StockRow) => {
+    onStockChange((prev) => prev.map((r) => (r.id === updatedItem.id ? updatedItem : r)));
+    setEditItem(null);
   };
 
   return (
@@ -484,11 +831,11 @@ export default function Stock({
                     <td className="px-6 py-5 text-center">{fmt(r.cost)} ฿</td>
                     <td className="px-6 py-5">
                       <div className="flex items-center justify-center gap-2">
-                        <button className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50" title="ดู">
+                        <button onClick={() => setDetailItem(r)} className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50" title="ดู">
                           <Eye className="h-4 w-4" />
                         </button>
                         {showEdit && (
-                          <button className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50" title="แก้ไข">
+                          <button onClick={() => setEditItem(r)} className="grid h-9 w-9 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50" title="แก้ไข">
                             <Pencil className="h-4 w-4" />
                           </button>
                         )}
@@ -511,6 +858,9 @@ export default function Stock({
         </div>
       </div>
       <div className="h-10" />
+
+      <StockDetailModal item={detailItem} onClose={() => setDetailItem(null)} />
+      <EditStockModal open={editItem !== null} item={editItem} onClose={() => setEditItem(null)} onUpdate={handleUpdate} />
     </div>
   );
 }
