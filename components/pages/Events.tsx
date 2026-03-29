@@ -36,6 +36,7 @@ type EventItem = {
   title: string;
   status: { text: string; tone: StatusTone };
   code: string;
+  createdAt: string;
   desc: string;
   company: string;
   place: string;
@@ -684,9 +685,9 @@ export default function Events({
   }, [isStatusOpen]);
 
   const [events, setEvents] = useState<EventItem[]>([
-    { id: "EVT001", title: "Annual Meeting 2025", status: { text: "อนุมัติแล้ว", tone: "success" }, code: "#EVT001", desc: "Annual shareholder meeting with presentation", company: "ABC Corporation", place: "Grand Hotel Bangkok", date: "2026-03-20 - 2026-03-21", items: "5 รายการ", organizer: "John Smith", branchCode: "SA", budgetTHB: 50000, attendees: 250 },
-    { id: "EVT002", title: "Product Launch Event", status: { text: "อนุมัติแล้ว", tone: "success" }, code: "#EVT002", desc: "New smartphone product launch with stage setup", company: "Tech Innovations Ltd", place: "Innovation Center", date: "2026-03-19 - 2026-03-19", items: "5 รายการ", organizer: "Emily Chen", branchCode: "HQ", budgetTHB: 120000, attendees: 500 },
-    { id: "EVT003", title: "Corporate Training Workshop", status: { text: "รออนุมัติ", tone: "pending" }, code: "#EVT003", desc: "Employee training and team building workshop", company: "Business Solutions Inc", place: "Training Center Building A", date: "2026-03-18 - 2026-03-20", items: "0 รายการ", organizer: "David Lee", branchCode: "BKK-01", budgetTHB: 20000, attendees: 60 },
+    { id: "EVT001", title: "Annual Meeting 2025", status: { text: "อนุมัติแล้ว", tone: "success" }, code: "#EVT001", createdAt: "2026-03-01T09:00:00.000Z", desc: "Annual shareholder meeting with presentation", company: "ABC Corporation", place: "Grand Hotel Bangkok", date: "2026-03-20 - 2026-03-21", items: "5 รายการ", organizer: "John Smith", branchCode: "SA", budgetTHB: 50000, attendees: 250 },
+    { id: "EVT002", title: "Product Launch Event", status: { text: "อนุมัติแล้ว", tone: "success" }, code: "#EVT002", createdAt: "2026-03-02T09:00:00.000Z", desc: "New smartphone product launch with stage setup", company: "Tech Innovations Ltd", place: "Innovation Center", date: "2026-03-19 - 2026-03-19", items: "5 รายการ", organizer: "Emily Chen", branchCode: "HQ", budgetTHB: 120000, attendees: 500 },
+    { id: "EVT003", title: "Corporate Training Workshop", status: { text: "รออนุมัติ", tone: "pending" }, code: "#EVT003", createdAt: "2026-03-03T09:00:00.000Z", desc: "Employee training and team building workshop", company: "Business Solutions Inc", place: "Training Center Building A", date: "2026-03-18 - 2026-03-20", items: "0 รายการ", organizer: "David Lee", branchCode: "BKK-01", budgetTHB: 20000, attendees: 60 },
   ]);
 
   const companyOptions = useMemo(() => Array.from(new Set(events.map((e) => e.company))).sort((a, b) => a.localeCompare(b)), [events]);
@@ -754,7 +755,7 @@ export default function Events({
 
   const handleCreate = (payload: { title: string; company: string; organizer: string; branchCode?: string; budgetTHB?: number; desc?: string; attendees?: number; place: string; startDate: string; endDate: string; }) => {
     const newId = `EVT${pad2(nextEventId).padStart(3, "0")}`;
-    const newEvent: EventItem = { id: newId, code: `#${newId}`, title: payload.title, company: payload.company, place: payload.place, desc: payload.desc ?? "", date: `${payload.startDate} - ${payload.endDate}`, items: "0 รายการ", status: { text: "รออนุมัติ", tone: "pending" }, organizer: payload.organizer, branchCode: payload.branchCode, budgetTHB: payload.budgetTHB, attendees: payload.attendees };
+    const newEvent: EventItem = { id: newId, code: `#${newId}`, createdAt: new Date().toISOString(), title: payload.title, company: payload.company, place: payload.place, desc: payload.desc ?? "", date: `${payload.startDate} - ${payload.endDate}`, items: "0 รายการ", status: { text: "รออนุมัติ", tone: "pending" }, organizer: payload.organizer, branchCode: payload.branchCode, budgetTHB: payload.budgetTHB, attendees: payload.attendees };
     setEvents((prev) => [...prev, newEvent]);
     setView("list");
     setToast(`สร้าง Event เรียบร้อย: "${payload.title}"`);
@@ -774,15 +775,11 @@ export default function Events({
         );
 
     return [...searched].sort((a, b) => {
-      const aStart = toDateLocal(parseDateRange(a.date).startStr).getTime();
-      const bStart = toDateLocal(parseDateRange(b.date).startStr).getTime();
-      if (aStart !== bStart) return aStart - bStart;
+      const aCreated = new Date(a.createdAt).getTime();
+      const bCreated = new Date(b.createdAt).getTime();
+      if (aCreated !== bCreated) return bCreated - aCreated;
 
-      const aEnd = toDateLocal(parseDateRange(a.date).endStr).getTime();
-      const bEnd = toDateLocal(parseDateRange(b.date).endStr).getTime();
-      if (aEnd !== bEnd) return aEnd - bEnd;
-
-      return a.id.localeCompare(b.id);
+      return b.id.localeCompare(a.id);
     });
   }, [events, statusFilter, search]);
 
