@@ -18,68 +18,29 @@ import {
 import type { Role } from "../AppShell";
 import type { StockRow, ItemStatus, Category } from "../AppShell";
 
-// ─── Master Data: หมวดหมู่ ────────────────────────────────────────────────────
 const SYSTEM_OPTIONS = [
-  "ระบบแสง",
-  "ระบบเสียง",
-  "ภาพ/โปรเจคเตอร์",
-  "เวที",
-  "เฟอร์นิเจอร์",
-  "ตกแต่ง",
-  "ไฟฟ้า/พลังงาน",
-  "ระบบ AV",
-  "อุปกรณ์สื่อสาร",
-  "อุปกรณ์ความปลอดภัย",
-  "อื่นๆ",
+  "ระบบแสง", "ระบบเสียง", "ภาพ/โปรเจคเตอร์", "เวที",
+  "เฟอร์นิเจอร์", "ตกแต่ง", "ไฟฟ้า/พลังงาน", "ระบบ AV",
+  "อุปกรณ์สื่อสาร", "อุปกรณ์ความปลอดภัย", "อื่นๆ",
 ];
 
-// ─── Searchable Dropdown: หมวดหมู่ ───────────────────────────────────────────
-function SystemDropdown({
-  value,
-  onChange,
-  error,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  error?: string;
-}) {
+function SystemDropdown({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState(""); // query สำหรับกรอง — ว่างเมื่อปิด
+  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ปิด dropdown เมื่อคลิกนอก
   React.useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) closeDropdown();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeDropdown();
-    };
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) closeDropdown(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeDropdown(); };
     window.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
+    return () => { window.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
   }, []);
 
-  const openDropdown = () => {
-    setQuery(""); // reset คำค้นหาทุกครั้งที่เปิด
-    setOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
-  };
-
-  const closeDropdown = () => {
-    setOpen(false);
-    setQuery("");
-  };
-
-  // เลือกแล้วปิดทันที
-  const select = (opt: string) => {
-    onChange(opt);
-    closeDropdown();
-  };
+  const openDropdown = () => { setQuery(""); setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); };
+  const closeDropdown = () => { setOpen(false); setQuery(""); };
+  const select = (opt: string) => { onChange(opt); closeDropdown(); };
 
   const filtered = useMemo(() => {
     const kw = query.trim().toLowerCase();
@@ -89,57 +50,22 @@ function SystemDropdown({
 
   return (
     <div ref={ref} className="relative">
-      {/* แสดงค่าที่เลือกอยู่ + ปุ่มเปิด dropdown */}
-      <button
-        type="button"
-        onClick={() => open ? closeDropdown() : openDropdown()}
-        className={[
-          "flex h-10 w-full items-center justify-between gap-2 rounded-xl border bg-zinc-50 px-3 text-left",
-          error
-            ? "border-red-300 ring-2 ring-red-100"
-            : open
-            ? "border-zinc-400 ring-2 ring-zinc-200"
-            : "border-zinc-200 hover:border-zinc-300",
-        ].join(" ")}
-      >
-        <span className={value ? "text-sm text-zinc-900" : "text-sm text-zinc-400"}>
-          {value || "เลือกหมวดหมู่..."}
-        </span>
+      <button type="button" onClick={() => open ? closeDropdown() : openDropdown()}
+        className={["flex h-10 w-full items-center justify-between gap-2 rounded-xl border bg-zinc-50 px-3 text-left", error ? "border-red-300 ring-2 ring-red-100" : open ? "border-zinc-400 ring-2 ring-zinc-200" : "border-zinc-200 hover:border-zinc-300"].join(" ")}>
+        <span className={value ? "text-sm text-zinc-900" : "text-sm text-zinc-400"}>{value || "เลือกหมวดหมู่..."}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
-
-      {/* Dropdown panel */}
       {open && (
         <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[200] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
-          {/* Search input อยู่ใน dropdown */}
           <div className="flex items-center gap-2 border-b border-zinc-100 px-3 py-2.5">
             <Search className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-            <input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="ค้นหาหมวดหมู่..."
-              className="flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400"
-            />
-            {query && (
-              <button type="button" onClick={() => setQuery("")} className="text-zinc-300 hover:text-zinc-500">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ค้นหาหมวดหมู่..." className="flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400" />
+            {query && <button type="button" onClick={() => setQuery("")} className="text-zinc-300 hover:text-zinc-500"><X className="h-3.5 w-3.5" /></button>}
           </div>
-
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-5 text-center">
               <span className="text-sm text-zinc-400">ไม่พบหมวดหมู่ที่ค้นหา</span>
-              {query.trim() && (
-                <button
-                  type="button"
-                  onClick={() => select(query.trim())}
-                  className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                >
-                  + เพิ่ม "{query.trim()}" เป็นหมวดหมู่ใหม่
-                </button>
-              )}
+              {query.trim() && <button type="button" onClick={() => select(query.trim())} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">+ เพิ่ม "{query.trim()}" เป็นหมวดหมู่ใหม่</button>}
             </div>
           ) : (
             <ul className="max-h-52 overflow-auto py-1">
@@ -147,19 +73,8 @@ function SystemDropdown({
                 const active = opt === value;
                 return (
                   <li key={opt}>
-                    <button
-                      type="button"
-                      onClick={() => select(opt)}
-                      className={[
-                        "flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition",
-                        active ? "bg-blue-50 font-semibold text-blue-700" : "text-zinc-700 hover:bg-zinc-50",
-                      ].join(" ")}
-                    >
-                      {/* dot แทน checkbox — กดเลือกแล้วปิดทันที ไม่มี toggle */}
-                      <span className={[
-                        "flex h-2 w-2 shrink-0 rounded-full",
-                        active ? "bg-blue-500" : "bg-transparent",
-                      ].join(" ")} />
+                    <button type="button" onClick={() => select(opt)} className={["flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition", active ? "bg-blue-50 font-semibold text-blue-700" : "text-zinc-700 hover:bg-zinc-50"].join(" ")}>
+                      <span className={["flex h-2 w-2 shrink-0 rounded-full", active ? "bg-blue-500" : "bg-transparent"].join(" ")} />
                       {opt}
                     </button>
                   </li>
@@ -169,69 +84,34 @@ function SystemDropdown({
           )}
         </div>
       )}
-
       {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
     </div>
   );
 }
 
-// ─── Modal: Confirm Delete ────────────────────────────────────────────────────
-function ConfirmDeleteModal({
-  open,
-  itemName,
-  onConfirm,
-  onCancel,
-}: {
-  open: boolean;
-  itemName: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
+function ConfirmDeleteModal({ open, itemName, onConfirm, onCancel }: { open: boolean; itemName: string; onConfirm: () => void; onCancel: () => void }) {
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onCancel]);
-
   if (!open) return null;
-
   return (
     <div className="fixed inset-0 z-[150]">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white shadow-2xl">
           <div className="p-6">
-            {/* Icon */}
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 ring-1 ring-red-100">
-              <Trash2 className="h-6 w-6 text-red-600" />
-            </div>
-
-            {/* Text */}
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 ring-1 ring-red-100"><Trash2 className="h-6 w-6 text-red-600" /></div>
             <div className="mt-4 text-center">
               <div className="text-base font-semibold text-zinc-900">ยืนยันการลบอุปกรณ์</div>
-              <div className="mt-2 text-sm text-zinc-500">
-                คุณต้องการลบ{" "}
-                <span className="font-semibold text-zinc-800">"{itemName}"</span>{" "}
-                ใช่หรือไม่?
-              </div>
+              <div className="mt-2 text-sm text-zinc-500">คุณต้องการลบ <span className="font-semibold text-zinc-800">"{itemName}"</span> ใช่หรือไม่?</div>
               <div className="mt-1 text-xs text-red-500">การกระทำนี้ไม่สามารถย้อนกลับได้</div>
             </div>
-
-            {/* Buttons */}
             <div className="mt-6 flex gap-3">
-              <button
-                onClick={onCancel}
-                className="flex-1 h-10 rounded-xl border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={onConfirm}
-                className="flex-1 h-10 rounded-xl bg-red-600 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition"
-              >
-                ตกลง
-              </button>
+              <button onClick={onCancel} className="flex-1 h-10 rounded-xl border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition">ยกเลิก</button>
+              <button onClick={onConfirm} className="flex-1 h-10 rounded-xl bg-red-600 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition">ตกลง</button>
             </div>
           </div>
         </div>
@@ -240,7 +120,6 @@ function ConfirmDeleteModal({
   );
 }
 
-// ─── Shared UI ────────────────────────────────────────────────────────────────
 function Pill({ children, tone }: { children: React.ReactNode; tone: "blue" | "green" | "amber" | "zinc" }) {
   const map = { blue: "bg-blue-100 text-blue-700 ring-1 ring-blue-200", green: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200", amber: "bg-amber-100 text-amber-700 ring-1 ring-amber-200", zinc: "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200" } as const;
   return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${map[tone]}`}>{children}</span>;
@@ -270,7 +149,6 @@ function Field({ label, required, children, error }: { label: string; required?:
   );
 }
 
-// ─── Modal: Stock Detail ──────────────────────────────────────────────────────
 function StockDetailModal({ item, onClose }: { item: StockRow | null; onClose: () => void }) {
   if (!item) return null;
   React.useEffect(() => {
@@ -318,7 +196,6 @@ function StockDetailModal({ item, onClose }: { item: StockRow | null; onClose: (
   );
 }
 
-// ─── Modal: Add New Stock ─────────────────────────────────────────────────────
 type AddForm = { id: string; status: ItemStatus; name: string; brand: string; category: Category; typeLabel: string; zone: string; qty: string; pricePerDay: string; cost: string; };
 
 function AddStockModal({ open, onClose, onAdd, nextId }: { open: boolean; onClose: () => void; onAdd: (row: StockRow) => void; nextId: string }) {
@@ -393,8 +270,6 @@ function AddStockModal({ open, onClose, onAdd, nextId }: { open: boolean; onClos
               <Field label="จำนวน" required error={errors.qty}><input value={form.qty} onChange={(e) => setForm((s) => ({ ...s, qty: e.target.value }))} placeholder="ระบุจำนวน" className={inp(errors.qty)} /></Field>
               <Field label="ค่าเช่า/วัน (บาท)" required error={errors.pricePerDay}><input value={form.pricePerDay} onChange={(e) => setForm((s) => ({ ...s, pricePerDay: e.target.value }))} placeholder="ระบุค่าเช่าต่อวัน" className={inp(errors.pricePerDay)} /></Field>
               <Field label="ราคาต้นทุน (บาท)" required error={errors.cost}><input value={form.cost} onChange={(e) => setForm((s) => ({ ...s, cost: e.target.value }))} placeholder="ระบุราคาต้นทุน" className={inp(errors.cost)} /></Field>
-
-              {/* ✅ หมวดหมู่ Searchable Dropdown */}
               <Field label="หมวดหมู่" required error={errors.typeLabel}>
                 <SystemDropdown value={form.typeLabel} onChange={(v) => setForm((s) => ({ ...s, typeLabel: v }))} error={errors.typeLabel} />
               </Field>
@@ -410,7 +285,6 @@ function AddStockModal({ open, onClose, onAdd, nextId }: { open: boolean; onClos
   );
 }
 
-// ─── Modal: Edit Stock ────────────────────────────────────────────────────────
 type EditForm = { status: ItemStatus; name: string; brand: string; category: Category; typeLabel: string; zone: string; qty: string; available: string; pricePerDay: string; cost: string; };
 
 function EditStockModal({ open, item, onClose, onUpdate }: { open: boolean; item: StockRow | null; onClose: () => void; onUpdate: (updatedItem: StockRow) => void }) {
@@ -469,9 +343,7 @@ function EditStockModal({ open, item, onClose, onUpdate }: { open: boolean; item
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="รหัส" required>
-                <input disabled value={item.id} className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3 text-sm text-zinc-500 outline-none" />
-              </Field>
+              <Field label="รหัส" required><input disabled value={item.id} className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3 text-sm text-zinc-500 outline-none" /></Field>
               <Field label="สถานะ" required>
                 <select value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as ItemStatus }))} className="h-10 w-full appearance-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 pr-10 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-200">
                   <option value="พร้อมใช้">พร้อมใช้</option><option value="ใช้งานอยู่">ใช้งานอยู่</option><option value="ซ่อมแซม">ซ่อมแซม</option>
@@ -493,15 +365,12 @@ function EditStockModal({ open, item, onClose, onUpdate }: { open: boolean; item
               <Field label="จำนวนพร้อมใช้" required error={errors.available}><input value={form.available} onChange={(e) => setForm((s) => ({ ...s, available: e.target.value }))} placeholder="ระบุจำนวนพร้อมใช้" className={inp(errors.available)} /></Field>
               <Field label="ค่าเช่า/วัน (บาท)" required error={errors.pricePerDay}><input value={form.pricePerDay} onChange={(e) => setForm((s) => ({ ...s, pricePerDay: e.target.value }))} placeholder="ระบุค่าเช่าต่อวัน" className={inp(errors.pricePerDay)} /></Field>
               <Field label="ราคาต้นทุน (บาท)" required error={errors.cost}><input value={form.cost} onChange={(e) => setForm((s) => ({ ...s, cost: e.target.value }))} placeholder="ระบุราคาต้นทุน" className={inp(errors.cost)} /></Field>
-
-              {/* ✅ หมวดหมู่ Searchable Dropdown — เต็ม 2 คอลัมน์ */}
               <div className="md:col-span-2">
                 <Field label="หมวดหมู่" required error={errors.typeLabel}>
                   <SystemDropdown value={form.typeLabel} onChange={(v) => setForm((s) => ({ ...s, typeLabel: v }))} error={errors.typeLabel} />
                 </Field>
               </div>
             </div>
-
             <div className="mt-6 flex items-center justify-end gap-3">
               <button onClick={onClose} className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">ยกเลิก</button>
               <button onClick={submit} className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">บันทึก</button>
@@ -548,6 +417,25 @@ export default function Stock({ role, stockData, onStockChange }: { role: Role; 
   const handleDelete = (id: string) => { onStockChange((prev) => prev.filter((r) => r.id !== id)); setDeleteItem(null); };
   const handleUpdate = (updated: StockRow) => { onStockChange((prev) => prev.map((r) => r.id === updated.id ? updated : r)); setEditItem(null); };
 
+  // ✅ เพิ่มแค่นี้ — ส่งออก Excel
+  const handleExportExcel = () => {
+    import("xlsx").then((XLSX) => {
+      const data = [
+        ["ID", "รหัส", "ชื่ออุปกรณ์", "ยี่ห้อ", "ประเภท", "หมวดหมู่", "โซน", "สถานะ", "จำนวนรวม", "พร้อมใช้", "ใช้งานอยู่", "ค่าเช่า/วัน (฿)", "ราคาต้นทุน (฿)"],
+        ...rows.map(r => [r.id, r.code, r.name, r.brand, r.category, r.system, r.zone, r.status, r.qty, r.available, r.qty - r.available, r.pricePerDay, r.cost]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws["!cols"] = [
+        { wch: 8 }, { wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 10 },
+        { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+        { wch: 12 }, { wch: 15 }, { wch: 15 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Stock");
+      XLSX.writeFile(wb, `stock-${new Date().toISOString().split("T")[0]}.xlsx`);
+    }).catch(() => alert("กรุณาติดตั้ง xlsx ก่อน:\nnpm install xlsx"));
+  };
+
   return (
     <div className="px-6 py-8">
       <AddStockModal open={isAddOpen} onClose={() => setIsAddOpen(false)} nextId={nextId} onAdd={handleAdd} />
@@ -566,7 +454,8 @@ export default function Stock({ role, stockData, onStockChange }: { role: Role; 
           <div><h1 className="text-2xl font-semibold tracking-tight text-zinc-900">จัดการ Stock</h1><p className="mt-1 text-sm text-zinc-500">ระบบจัดการและค้นหาอุปกรณ์</p></div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button className="inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"><Download className="h-4 w-4" />ส่งออก Excel</button>
+          {/* ✅ เพิ่ม onClick={handleExportExcel} แค่นี้เลย */}
+          <button onClick={handleExportExcel} className="inline-flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"><Download className="h-4 w-4" />ส่งออก Excel</button>
           <button onClick={() => setIsAddOpen(true)} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus className="h-4 w-4" />เพิ่มใหม่</button>
         </div>
       </div>
