@@ -48,6 +48,14 @@ export type StockRow = {
   cost: number;
 };
 
+function toCategory(v: string): Category {
+  return v === "ไฟฟ้า" || v === "ผ้าใบ" || v === "ตกแต่ง" ? v : "ตกแต่ง";
+}
+
+function toItemStatus(v: string): ItemStatus {
+  return v === "พร้อมใช้" || v === "ใช้งานอยู่" || v === "ซ่อมแซม" ? v : "พร้อมใช้";
+}
+
 const initialStock: StockRow[] = [
   {
     id: "EQ001", code: "LT-1234", name: "ชุดไฟ LED หลากสี 200W",
@@ -169,14 +177,78 @@ export default function AppShell() {
   // ✅ shared stock state — Events และ Stock ใช้ข้อมูลชุดเดียวกัน
   const [stockData, setStockData] = useState<StockRow[]>(initialStock);
 
+  useEffect(() => {
+    const loadStock = async () => {
+      try {
+        const res = await fetch("/api/stock");
+        if (!res.ok) throw new Error("failed to load stock");
+        const rows = (await res.json()) as Array<{
+          id: string;
+          code: string;
+          name: string;
+          brand: string;
+          category: string;
+          system: string;
+          zone: string;
+          status: string;
+          qty: number;
+          available: number;
+          pricePerDay: number;
+          cost: number;
+        }>;
+
+        if (rows.length === 0) {
+          await fetch("/api/stock", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: initialStock }),
+          });
+          setStockData(initialStock);
+          return;
+        }
+
+        setStockData(
+          rows.map((r) => ({
+            id: r.id,
+            code: r.code,
+            name: r.name,
+            brand: r.brand,
+            category: toCategory(r.category),
+            system: r.system,
+            zone: r.zone,
+            status: toItemStatus(r.status),
+            qty: r.qty,
+            available: r.available,
+            pricePerDay: r.pricePerDay,
+            cost: r.cost,
+          }))
+        );
+      } catch {
+        setStockData(initialStock);
+      }
+    };
+    loadStock();
+  }, []);
+
+  const applyStockChange = (updater: StockRow[] | ((prev: StockRow[]) => StockRow[])) => {
+    setStockData((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      fetch("/api/stock", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: next }),
+      }).catch(() => {});
+      return next;
+    });
+  };
+
   // ✅ function หักสต็อกเมื่ออนุมัติ Event
   const deductStock = (equipmentList: { name: string; qty: number }[]) => {
-    setStockData((prev) =>
+    applyStockChange((prev) =>
       prev.map((row) => {
         const match = equipmentList.find((eq) => eq.name === row.name);
         if (!match) return row;
         const newAvailable = Math.max(0, row.available - match.qty);
-        const inUse = row.qty - newAvailable;
         return {
           ...row,
           available: newAvailable,
@@ -188,7 +260,7 @@ export default function AppShell() {
 
   // ✅ function คืนสต็อกเมื่อ Event ไม่อนุมัติ หรือคืนของ
   const returnStock = (equipmentList: { name: string; qty: number }[]) => {
-    setStockData((prev) =>
+    applyStockChange((prev) =>
       prev.map((row) => {
         const match = equipmentList.find((eq) => eq.name === row.name);
         if (!match) return row;
@@ -415,11 +487,17 @@ export default function AppShell() {
           <Stock
             role={role}
             stockData={stockData}
-            onStockChange={setStockData}
+            onStockChange={applyStockChange}
           />
         )}
-        {tab === "issueReturn" && <IssueReturn />}
-        {tab === "reports" && <Reports />}
+        {tab === "issueReturn" && (
+          <IssueReturn
+            stockData={stockData}
+            onDeductStock={deductStock}
+            onReturnStock={returnStock}
+          />
+        )}
+        {tab === "reports" && <Reports stockData={stockData} />}
         {tab === "settings" && role === "Manager" && <SettingsPage />}
         {tab === "settings" && role !== "Manager" && (
           <div className="px-6 py-10 text-sm text-zinc-500">Manager Only</div>

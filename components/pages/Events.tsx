@@ -67,6 +67,10 @@ type NotificationItem = {
   unreadFor: Role[];
 };
 
+type EventApiItem = EventItem & {
+  equipment?: SelectedEquipment[];
+};
+
 function StatCard({ icon, value, label, tone }: { icon: React.ReactNode; value: number; label: string; tone: "neutral" | "amber" | "emerald" | "sky" }) {
   const toneMap = { neutral: "bg-zinc-100 text-zinc-700", amber: "bg-amber-100 text-amber-700", emerald: "bg-emerald-100 text-emerald-700", sky: "bg-sky-100 text-sky-700" } as const;
   return (
@@ -676,6 +680,7 @@ export default function Events({
   const [statusFilter, setStatusFilter] = useState<string>("สถานะทั้งหมด");
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement | null>(null);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => { if (!isStatusOpen || !statusRef.current) return; if (!statusRef.current.contains(e.target as Node)) setIsStatusOpen(false); };
@@ -684,11 +689,7 @@ export default function Events({
     return () => { window.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
   }, [isStatusOpen]);
 
-  const [events, setEvents] = useState<EventItem[]>([
-    { id: "EVT001", title: "Annual Meeting 2025", status: { text: "อนุมัติแล้ว", tone: "success" }, code: "#EVT001", createdAt: "2026-03-01T09:00:00.000Z", desc: "Annual shareholder meeting with presentation", company: "ABC Corporation", place: "Grand Hotel Bangkok", date: "2026-03-20 - 2026-03-21", items: "5 รายการ", organizer: "John Smith", branchCode: "SA", budgetTHB: 50000, attendees: 250 },
-    { id: "EVT002", title: "Product Launch Event", status: { text: "อนุมัติแล้ว", tone: "success" }, code: "#EVT002", createdAt: "2026-03-02T09:00:00.000Z", desc: "New smartphone product launch with stage setup", company: "Tech Innovations Ltd", place: "Innovation Center", date: "2026-03-19 - 2026-03-19", items: "5 รายการ", organizer: "Emily Chen", branchCode: "HQ", budgetTHB: 120000, attendees: 500 },
-    { id: "EVT003", title: "Corporate Training Workshop", status: { text: "รออนุมัติ", tone: "pending" }, code: "#EVT003", createdAt: "2026-03-03T09:00:00.000Z", desc: "Employee training and team building workshop", company: "Business Solutions Inc", place: "Training Center Building A", date: "2026-03-18 - 2026-03-20", items: "0 รายการ", organizer: "David Lee", branchCode: "BKK-01", budgetTHB: 20000, attendees: 60 },
-  ]);
+  const [events, setEvents] = useState<EventItem[]>([]);
 
   const companyOptions = useMemo(() => Array.from(new Set(events.map((e) => e.company))).sort((a, b) => a.localeCompare(b)), [events]);
 
@@ -722,15 +723,60 @@ export default function Events({
   const [search, setSearch] = useState("");
   const [calendarDetail, setCalendarDetail] = useState<{ dateKey: string; events: EventItem[] } | null>(null);
 
+  useEffect(() => {
+    const loadEvents = async () => {
+      setIsLoadingEvents(true);
+      try {
+        const res = await fetch("/api/events");
+        if (!res.ok) throw new Error("failed to fetch events");
+        const rows = (await res.json()) as EventApiItem[];
+        setEvents(rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          status: r.status,
+          code: r.code,
+          createdAt: r.createdAt,
+          desc: r.desc,
+          company: r.company,
+          place: r.place,
+          date: r.date,
+          items: r.items,
+          organizer: r.organizer,
+          branchCode: r.branchCode,
+          budgetTHB: r.budgetTHB,
+          attendees: r.attendees,
+        })));
+        const equipmentMap: Record<string, SelectedEquipment[]> = {};
+        for (const row of rows) {
+          equipmentMap[row.id] = Array.isArray(row.equipment) ? row.equipment : [];
+        }
+        setEquipmentByEvent(equipmentMap);
+      } catch {
+        setToast("ไม่สามารถโหลดข้อมูล Event จากฐานข้อมูลได้");
+      } finally {
+        setIsLoadingEvents(false);
+      }
+    };
+    loadEvents();
+  }, []);
+
   const detailEvent = useMemo(() => { if (!detailEventId) return null; return events.find((e) => e.id === detailEventId) ?? null; }, [detailEventId, events]);
   const detailEquipment = useMemo(() => (detailEventId ? equipmentByEvent[detailEventId] ?? [] : []), [detailEventId, equipmentByEvent]);
 
   const onManageItems = (eventId: string) => { setManageEventId(eventId); setIsManageOpen(true); };
 
-  const onDeleteEvent = (eventId: string) => {
+  const onDeleteEvent = async (eventId: string) => {
     const target = events.find((ev) => ev.id === eventId);
     if (!target) return;
     if (!window.confirm(`ลบ Event "${target.title}" ใช่หรือไม่?`)) return;
+
+    try {
+      const res = await fetch(`/api/events/${eventId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("failed to delete event");
+    } catch {
+      setToast("ไม่สามารถลบ Event ได้");
+      return;
+    }
 
     // ✅ คืน stock ถ้า event ที่ลบเคยถูกอนุมัติ
     if (target.status.tone === "success" && equipmentByEvent[eventId]) {
@@ -747,19 +793,50 @@ export default function Events({
   const activeEvent = useMemo(() => { if (!manageEventId) return null; return events.find((e) => e.id === manageEventId) ?? null; }, [manageEventId, events]);
   const activeEventRange = useMemo(() => { if (!activeEvent) return { startStr: "", endStr: "" }; return parseDateRange(activeEvent.date); }, [activeEvent]);
 
-  const nextEventId = useMemo(() => {
-    let max = 0;
-    for (const e of events) { const m = e.id.match(/^EVT(\d+)$/); if (m) max = Math.max(max, Number(m[1])); }
-    return max + 1;
-  }, [events]);
+  const handleCreate = async (payload: { title: string; company: string; organizer: string; branchCode?: string; budgetTHB?: number; desc?: string; attendees?: number; place: string; startDate: string; endDate: string; }) => {
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("failed to create event");
+      const created = (await res.json()) as { id: string; createdAt: string };
+      const newEvent: EventItem = {
+        id: created.id,
+        code: `#${created.id}`,
+        createdAt: created.createdAt,
+        title: payload.title,
+        company: payload.company,
+        place: payload.place,
+        desc: payload.desc ?? "",
+        date: `${payload.startDate} - ${payload.endDate}`,
+        items: "0 รายการ",
+        status: { text: "รออนุมัติ", tone: "pending" },
+        organizer: payload.organizer,
+        branchCode: payload.branchCode,
+        budgetTHB: payload.budgetTHB,
+        attendees: payload.attendees,
+      };
+      setEvents((prev) => [newEvent, ...prev]);
+      setEquipmentByEvent((prev) => ({ ...prev, [created.id]: [] }));
+      setView("list");
+      setToast(`สร้าง Event เรียบร้อย: "${payload.title}"`);
 
-  const handleCreate = (payload: { title: string; company: string; organizer: string; branchCode?: string; budgetTHB?: number; desc?: string; attendees?: number; place: string; startDate: string; endDate: string; }) => {
-    const newId = `EVT${pad2(nextEventId).padStart(3, "0")}`;
-    const newEvent: EventItem = { id: newId, code: `#${newId}`, createdAt: new Date().toISOString(), title: payload.title, company: payload.company, place: payload.place, desc: payload.desc ?? "", date: `${payload.startDate} - ${payload.endDate}`, items: "0 รายการ", status: { text: "รออนุมัติ", tone: "pending" }, organizer: payload.organizer, branchCode: payload.branchCode, budgetTHB: payload.budgetTHB, attendees: payload.attendees };
-    setEvents((prev) => [...prev, newEvent]);
-    setView("list");
-    setToast(`สร้าง Event เรียบร้อย: "${payload.title}"`);
-    if (role === "SA") { fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Event ใหม่รออนุมัติ", message: `${payload.title} สร้างโดย SA รอการอนุมัติ`, audience: ["Manager"] }) }).catch(() => {}); }
+      if (role === "SA") {
+        fetch("/api/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "Event ใหม่รออนุมัติ",
+            message: `${payload.title} สร้างโดย SA รอการอนุมัติ`,
+            audience: ["Manager"],
+          }),
+        }).catch(() => {});
+      }
+    } catch {
+      setToast("ไม่สามารถสร้าง Event ได้");
+    }
   };
 
   const visibleEvents = useMemo(() => {
@@ -845,8 +922,21 @@ export default function Events({
             setEquipmentByEvent((prev) => ({ ...prev, [manageEventId]: equipment }));
             setEvents((prev) => prev.map((ev) => {
               if (ev.id !== manageEventId) return ev;
-              return { ...ev, date: `${startDate} - ${endDate}`, items: `${equipment.length} รายการ`, status: decision === "approved" ? { text: "อนุมัติแล้ว", tone: "success" } : { text: "ไม่อนุมัติ", tone: "rejected" } };
+              return {
+                ...ev,
+                date: `${startDate} - ${endDate}`,
+                items: `${equipment.length} รายการ`,
+                status: decision === "approved" ? { text: "อนุมัติแล้ว", tone: "success" } : { text: "ไม่อนุมัติ", tone: "rejected" },
+              };
             }));
+
+            fetch(`/api/events/${manageEventId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ startDate, endDate, equipment, decision }),
+            }).catch(() => {
+              setToast("ไม่สามารถบันทึก Event ลงฐานข้อมูลได้");
+            });
 
             if (decision === "approved") {
               // ✅ หัก stock จริงเมื่ออนุมัติ
@@ -909,6 +999,9 @@ export default function Events({
 
       {view === "list" && (
         <div className="mt-5 space-y-4">
+          {isLoadingEvents && (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500 shadow-sm">กำลังโหลดข้อมูล Event...</div>
+          )}
           {visibleEvents.map((e) => (
             <div key={e.code} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md">
               <div className="flex items-start justify-between gap-4">

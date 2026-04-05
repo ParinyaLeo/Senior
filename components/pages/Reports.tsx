@@ -14,6 +14,7 @@ import {
   Eye,
   Trash2,
 } from "lucide-react";
+import type { StockRow as AppStockRow } from "../AppShell";
 
 type ReportTab = "finance" | "stock" | "events" | "damage" | "docs";
 
@@ -109,7 +110,6 @@ function SummaryCard({ icon, value, label, tone }: { icon: React.ReactNode; valu
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type StockRow = { name: string; code: string; type: string; warehouse: string; qty: number; ready: number; pricePerDay: number; cost: number; };
 type EventReportRow = { id: string; title: string; company: string; date: string; revenue: number; equipmentCount: number; status: { text: string; tone: "success" | "pending" }; };
 type DocRow = { id: string; title: string; owner: string; category: DocCategory; eventOrCompany: string; description: string; uploadedAt: string; uploadedAtISO: string; sizeLabel: string; };
 
@@ -131,7 +131,7 @@ function exportToExcel(sheetName: string, filename: string, data: (string | numb
   });
 }
 
-export default function Reports() {
+export default function Reports({ stockData }: { stockData: AppStockRow[] }) {
   const [tab, setTab] = useState<ReportTab>("finance");
   const [query, setQuery] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<DocRow | null>(null);
@@ -140,21 +140,55 @@ export default function Reports() {
 
   const finance = useMemo(() => ({ totalRevenue: 0, totalEvents: 0, avgPerEvent: 0, topEvents: [] as { id: string; name: string; amount: number }[] }), []);
 
-  const stockRows: StockRow[] = useMemo(() => [
-    { name: "ชุดไฟ LED หลากสี 200W", code: "PRO LIGHT - LT-1234", type: "ระบบแสง", warehouse: "โกดัง A", qty: 50, ready: 50, pricePerDay: 800, cost: 15000 },
-    { name: "ชุดไฟเวที Moving Head 300W", code: "STAGE PRO - LT-5678", type: "ระบบแสง", warehouse: "โกดัง A", qty: 30, ready: 28, pricePerDay: 1500, cost: 45000 },
-    { name: "ชุดไฟ Par Light LED RGB", code: "LIGHT MASTER - LT-9012", type: "ระบบแสง", warehouse: "โกดัง A", qty: 40, ready: 35, pricePerDay: 600, cost: 12000 },
-    { name: "เวทีขนาดเล็ก 2x2 เมตร", code: "STAGE TECH - ST-0001", type: "เวที", warehouse: "โกดัง B", qty: 20, ready: 20, pricePerDay: 1200, cost: 25000 },
-    { name: "เวทีขนาดกลาง 4x4 เมตร", code: "STAGE TECH - ST-0002", type: "เวที", warehouse: "โกดัง B", qty: 15, ready: 12, pricePerDay: 2500, cost: 55000 },
-    { name: "เวทีขนาดใหญ่ 6x8 เมตร", code: "STAGE TECH - ST-0003", type: "เวที", warehouse: "โกดัง B", qty: 10, ready: 8, pricePerDay: 5000, cost: 120000 },
-    { name: "หญ้าเทียม (ม้วน 2x10 เมตร)", code: "GREEN GRASS - GR-7890", type: "ตกแต่ง", warehouse: "โกดัง C", qty: 100, ready: 85, pricePerDay: 300, cost: 3500 },
-  ], []);
+  const stockRows = useMemo(() => stockData.map((r) => ({
+    name: r.name,
+    code: `${r.brand} - ${r.code}`,
+    type: r.system,
+    warehouse: r.zone,
+    qty: r.qty,
+    ready: r.available,
+    pricePerDay: r.pricePerDay,
+    cost: r.cost,
+  })), [stockData]);
 
-  const eventReportRows: EventReportRow[] = useMemo(() => [
-    { id: "EVT001", title: "Annual Meeting 2025", company: "ABC Corporation", date: "2025-11-20", revenue: 15900, equipmentCount: 5, status: { text: "อนุมัติแล้ว", tone: "success" } },
-    { id: "EVT002", title: "Product Launch Event", company: "Tech Innovations Ltd", date: "2025-11-25", revenue: 35000, equipmentCount: 5, status: { text: "อนุมัติแล้ว", tone: "success" } },
-    { id: "EVT003", title: "Corporate Training Workshop", company: "Business Solutions Inc", date: "2025-11-28", revenue: 0, equipmentCount: 0, status: { text: "รออนุมัติ", tone: "pending" } },
-  ], []);
+  const [eventReportRows, setEventReportRows] = useState<EventReportRow[]>([]);
+
+  React.useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const res = await fetch("/api/events");
+        if (!res.ok) throw new Error("failed to fetch events");
+        const rows = (await res.json()) as Array<{
+          id: string;
+          title: string;
+          company: string;
+          date: string;
+          items: string;
+          status: { text: string; tone: "success" | "pending" | "progress" | "rejected" };
+          equipment?: Array<{ qty: number; pricePerDayTHB: number }>;
+        }>;
+
+        setEventReportRows(rows.map((r) => {
+          const revenue = Array.isArray(r.equipment)
+            ? r.equipment.reduce((sum, eq) => sum + (eq.qty * eq.pricePerDayTHB), 0)
+            : 0;
+          return {
+            id: r.id,
+            title: r.title,
+            company: r.company,
+            date: r.date,
+            revenue,
+            equipmentCount: Array.isArray(r.equipment) ? r.equipment.length : 0,
+            status: { text: r.status.text, tone: r.status.tone === "success" ? "success" : "pending" },
+          };
+        }));
+      } catch {
+        setEventReportRows([]);
+      }
+    };
+
+    loadEvents();
+  }, []);
 
   const damageRows = useMemo(() => [] as { id: string; itemName: string; code: string; eventId?: string; date: string; cost: number; status: "reported" | "fixed" }[], []);
 

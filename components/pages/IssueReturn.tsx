@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Clock3,
   ArrowRight,
@@ -16,6 +16,7 @@ import {
   CheckCircle,
   AlertTriangle,
 } from "lucide-react";
+import type { StockRow } from "../AppShell";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,25 +47,11 @@ type EquipmentItem = {
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
-const EQUIPMENT_OPTIONS = [
-  { id: "eq1", name: "ชุดไฟ LED หลากสี 200W", available: 50 },
-  { id: "eq2", name: "ชุดไฟ Moving Head 300W", available: 28 },
-  { id: "eq3", name: "ชุดไฟ Par Light LED RGB", available: 35 },
-  { id: "eq4", name: "เวทีขนาดเล็ก 2x2 เมตร", available: 20 },
-  { id: "eq5", name: "เวทีกลาง 4x4 เมตร", available: 12 },
-  { id: "eq6", name: "เวทีขนาดใหญ่ 6x8 เมตร", available: 8 },
-  { id: "eq7", name: "หญ้าเทียม (ม้วน 2x10 เมตร)", available: 85 },
-  { id: "eq8", name: "โต๊ะพับหน้าไม้ 180cm", available: 180 },
-  { id: "eq9", name: "เก้าอี้พลาสติก มีพนักพิง", available: 420 },
-  { id: "eq10", name: "เครื่องเสียง PA System 2000W", available: 18 },
-  { id: "eq11", name: "ไมโครโฟนไร้สายคู่", available: 35 },
-  { id: "eq12", name: "โปรเจคเตอร์ 5000 Lumens", available: 22 },
-];
-
-const INITIAL_EVENTS: IssueEvent[] = [
-  { id: "EVT001", title: "Annual Meeting 2025", code: "#EVT001", company: "ABC Corporation", eventDate: "2026-03-20", issueDate: "2026-03-19", equipment: "5 items", status: "ready" },
-  { id: "EVT002", title: "Product Launch Event", code: "#EVT002", company: "Tech Innovations Ltd", eventDate: "2026-03-19", issueDate: "2026-03-18", equipment: "5 items", status: "ready" },
-];
+type EquipmentOption = {
+  id: string;
+  name: string;
+  available: number;
+};
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 
@@ -96,10 +83,12 @@ function SelectEquipmentModal({
   open,
   onClose,
   onAdd,
+  equipmentOptions,
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (item: EquipmentItem) => void;
+  equipmentOptions: EquipmentOption[];
 }) {
   const [selectedId, setSelectedId] = useState("");
   const [qty, setQty] = useState("");
@@ -117,7 +106,7 @@ function SelectEquipmentModal({
     return () => window.removeEventListener("mousedown", onDown);
   }, []);
 
-  const selected = EQUIPMENT_OPTIONS.find(o => o.id === selectedId);
+  const selected = equipmentOptions.find((o) => o.id === selectedId);
 
   const submit = () => {
     const q = Number(qty);
@@ -151,7 +140,7 @@ function SelectEquipmentModal({
               </button>
               {dropOpen && (
                 <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-60 overflow-auto rounded-xl border border-zinc-200 bg-white shadow-lg">
-                  {EQUIPMENT_OPTIONS.map(opt => (
+                  {equipmentOptions.map((opt) => (
                     <button key={opt.id} type="button" onClick={() => { setSelectedId(opt.id); setDropOpen(false); setError(""); }}
                       className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50 ${opt.id === selectedId ? "bg-zinc-100 font-semibold" : ""}`}>
                       <span>{opt.name}</span>
@@ -191,10 +180,12 @@ function QuickIssueModal({
   open,
   onClose,
   onConfirm,
+  equipmentOptions,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (items: EquipmentItem[]) => void;
+  equipmentOptions: EquipmentOption[];
 }) {
   const [items, setItems] = useState<EquipmentItem[]>([]);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
@@ -221,7 +212,7 @@ function QuickIssueModal({
 
   return (
     <>
-      <SelectEquipmentModal open={isSelectOpen} onClose={() => setIsSelectOpen(false)} onAdd={addItem} />
+      <SelectEquipmentModal open={isSelectOpen} onClose={() => setIsSelectOpen(false)} onAdd={addItem} equipmentOptions={equipmentOptions} />
       <div className="fixed inset-0 z-[140]">
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
         <div className="absolute inset-0 flex items-center justify-center p-4">
@@ -283,10 +274,12 @@ function QuickReturnModal({
   open,
   onClose,
   onConfirm,
+  equipmentOptions,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: (items: EquipmentItem[], damaged: boolean, photos: File[]) => void;
+  equipmentOptions: EquipmentOption[];
 }) {
   const [items, setItems] = useState<EquipmentItem[]>([]);
   const [isDamaged, setIsDamaged] = useState(false);
@@ -325,7 +318,7 @@ function QuickReturnModal({
 
   return (
     <>
-      <SelectEquipmentModal open={isSelectOpen} onClose={() => setIsSelectOpen(false)} onAdd={addItem} />
+      <SelectEquipmentModal open={isSelectOpen} onClose={() => setIsSelectOpen(false)} onAdd={addItem} equipmentOptions={equipmentOptions} />
       <div className="fixed inset-0 z-[140]">
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
         <div className="absolute inset-0 flex items-center justify-center p-4">
@@ -604,11 +597,67 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function IssueReturn() {
+export default function IssueReturn({
+  stockData,
+  onDeductStock,
+  onReturnStock,
+}: {
+  stockData: StockRow[];
+  onDeductStock: (equipmentList: { name: string; qty: number }[]) => void;
+  onReturnStock: (equipmentList: { name: string; qty: number }[]) => void;
+}) {
   const [tab, setTab] = useState<TabKey>("issue");
 
   // State หลัก: เก็บสถานะของทุก Event
-  const [events, setEvents] = useState<IssueEvent[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<IssueEvent[]>([]);
+
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const res = await fetch("/api/events");
+        if (!res.ok) throw new Error("failed to load events");
+        const rows = (await res.json()) as Array<{
+          id: string;
+          title: string;
+          code: string;
+          company: string;
+          date: string;
+          items: string;
+          status: { text: string; tone: string };
+        }>;
+
+        const mapped = rows
+          .filter((r) => r.status?.tone === "success")
+          .map((r) => {
+            const [startDate] = r.date.split(" - ").map((s) => s.trim());
+            return {
+              id: r.id,
+              title: r.title,
+              code: r.code,
+              company: r.company,
+              eventDate: startDate,
+              issueDate: startDate,
+              equipment: r.items,
+              status: "ready" as EventStatus,
+            };
+          });
+
+        setEvents((prev) => {
+          if (prev.length === 0) return mapped;
+          const currentStatus = new Map(prev.map((e) => [e.id, e.status]));
+          return mapped.map((e) => ({ ...e, status: currentStatus.get(e.id) ?? "ready" }));
+        });
+      } catch {
+        setEvents([]);
+      }
+    };
+    loadEvents();
+  }, []);
+
+  const equipmentOptions = useMemo(
+    () => stockData.map((s) => ({ id: s.id, name: s.name, available: s.available })),
+    [stockData]
+  );
 
   // Modal states
   const [isQuickIssueOpen, setIsQuickIssueOpen] = useState(false);
@@ -660,12 +709,14 @@ export default function IssueReturn() {
 
   // Quick Issue (เบิกเร่งด่วน ไม่ผ่าน Event)
   const handleQuickIssue = (items: EquipmentItem[]) => {
+    onDeductStock(items.map((i) => ({ name: i.name, qty: i.qty })));
     const names = items.map(i => i.name).join(", ");
     setToast(`✅ Quick Issue สำเร็จ: ${names}`);
   };
 
   // Quick Return (คืนเร่งด่วน ไม่ผ่าน Event)
   const handleQuickReturn = (items: EquipmentItem[], damaged: boolean) => {
+    onReturnStock(items.map((i) => ({ name: i.name, qty: i.qty })));
     const names = items.map(i => i.name).join(", ");
     setToast(`✅ Quick Return สำเร็จ: ${names}${damaged ? " (มีความเสียหาย)" : ""}`);
   };
@@ -675,8 +726,8 @@ export default function IssueReturn() {
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
       {/* Modals */}
-      <QuickIssueModal open={isQuickIssueOpen} onClose={() => setIsQuickIssueOpen(false)} onConfirm={handleQuickIssue} />
-      <QuickReturnModal open={isQuickReturnOpen} onClose={() => setIsQuickReturnOpen(false)} onConfirm={handleQuickReturn} />
+      <QuickIssueModal open={isQuickIssueOpen} onClose={() => setIsQuickIssueOpen(false)} onConfirm={handleQuickIssue} equipmentOptions={equipmentOptions} />
+      <QuickReturnModal open={isQuickReturnOpen} onClose={() => setIsQuickReturnOpen(false)} onConfirm={handleQuickReturn} equipmentOptions={equipmentOptions} />
       <ConfirmIssueModal open={!!confirmIssueEvent} event={confirmIssueEvent} onConfirm={handleConfirmIssue} onCancel={() => setConfirmIssueEvent(null)} />
       <ConfirmReturnModal open={!!confirmReturnEvent} event={confirmReturnEvent} onConfirm={(damaged, photos) => handleConfirmReturn(damaged)} onCancel={() => setConfirmReturnEvent(null)} />
 
