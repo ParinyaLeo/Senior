@@ -26,6 +26,7 @@ export type NotificationRow = {
 };
 
 export type EventStatusTone = "success" | "pending" | "progress" | "rejected";
+export type EventLifecycleStatus = "ready" | "inuse" | "returned";
 
 export type EventEquipmentRow = {
   name: string;
@@ -40,6 +41,7 @@ export type EventRow = {
   title: string;
   status_text: string;
   status_tone: EventStatusTone;
+  issue_status: EventLifecycleStatus;
   created_at: string;
   description: string;
   company: string;
@@ -109,6 +111,10 @@ async function ensureEventsTable(client?: PoolClient) {
         attendees INTEGER,
         equipment JSONB NOT NULL DEFAULT '[]'::jsonb
       );
+    `);
+    await c.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS issue_status TEXT NOT NULL DEFAULT 'ready';
     `);
   } finally {
     if (!client) c.release();
@@ -246,6 +252,7 @@ export async function listEvents(): Promise<EventRow[]> {
          title,
          status_text,
          status_tone,
+         issue_status,
          created_at,
          description,
          company,
@@ -262,6 +269,40 @@ export async function listEvents(): Promise<EventRow[]> {
        ORDER BY created_at DESC, id DESC`
     );
     return res.rows;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getEventById(id: string): Promise<EventRow | null> {
+  const client = await pool.connect();
+  try {
+    await ensureEventsTable(client);
+    const res: QueryResult<EventRow> = await client.query(
+      `SELECT
+         id,
+         title,
+         status_text,
+         status_tone,
+         issue_status,
+         created_at,
+         description,
+         company,
+         place,
+         start_date,
+         end_date,
+         items_count,
+         organizer,
+         branch_code,
+         budget_thb,
+         attendees,
+         equipment
+       FROM events
+       WHERE id = $1
+       LIMIT 1`,
+      [id]
+    );
+    return res.rows[0] ?? null;
   } finally {
     client.release();
   }
@@ -291,10 +332,10 @@ export async function insertEvent(payload: {
     await client.query(
       `INSERT INTO events (
         id, title, status_text, status_tone, created_at, description, company, place,
-        start_date, end_date, items_count, organizer, branch_code, budget_thb, attendees, equipment
+        start_date, end_date, items_count, organizer, branch_code, budget_thb, attendees, equipment, issue_status
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14, $15, $16::jsonb
+        $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17
       )`,
       [
         payload.id,
@@ -313,7 +354,53 @@ export async function insertEvent(payload: {
         payload.budgetTHB ?? null,
         payload.attendees ?? null,
         JSON.stringify(payload.equipment ?? []),
+        "ready",
       ]
+    );
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateEventIssueStatus(id: string, issueStatus: EventLifecycleStatus) {
+  const client = await pool.connect();
+  try {
+    await ensureEventsTable(client);
+    const res = await client.query(
+      `UPDATE events
+       SET issue_status = $2
+       WHERE id = $1`,
+      [id, issueStatus]
+    );
+    return res.rowCount ?? 0;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deductStockForEventIssue(eventId: string) {
+  const client = await pool.connect();
+  try {
+    await ensureEventsTable(client);
+    await ensureStockTable(client);
+    await client.query(
+      `UPDATE stock_items s
+       SET
+         available = GREATEST(0, s.available - e.qty),
+         status = CASE
+           WHEN GREATEST(0, s.available - e.qty) = 0 THEN 'ใช้งานอยู่'
+           ELSE s.status
+         END
+       FROM (
+         SELECT
+           item->>'name' AS name,
+           GREATEST(0, COALESCE((item->>'qty')::int, 0)) AS qty
+         FROM events ev,
+              jsonb_array_elements(ev.equipment) AS item
+         WHERE ev.id = $1
+       ) e
+       WHERE s.name = e.name`,
+      [eventId]
     );
   } finally {
     client.release();

@@ -274,6 +274,20 @@ export default function AppShell() {
     );
   };
 
+  // ✅ function แจ้งอุปกรณ์เสียหาย: ติดสถานะซ่อมแซม โดยยังไม่เพิ่มจำนวนพร้อมใช้
+  const markDamagedStock = (equipmentList: { name: string; qty: number }[]) => {
+    applyStockChange((prev) =>
+      prev.map((row) => {
+        const match = equipmentList.find((eq) => eq.name === row.name);
+        if (!match) return row;
+        return {
+          ...row,
+          status: "ซ่อมแซม",
+        };
+      })
+    );
+  };
+
   const isSA = role === "SA";
 
   React.useEffect(() => {
@@ -495,6 +509,7 @@ export default function AppShell() {
             stockData={stockData}
             onDeductStock={deductStock}
             onReturnStock={returnStock}
+            onMarkDamagedStock={markDamagedStock}
           />
         )}
         {tab === "reports" && <Reports stockData={stockData} />}

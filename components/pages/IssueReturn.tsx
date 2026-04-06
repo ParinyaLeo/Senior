@@ -45,6 +45,11 @@ type EquipmentItem = {
   qty: number;
 };
 
+type EventEquipmentItem = {
+  name: string;
+  qty: number;
+};
+
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
 type EquipmentOption = {
@@ -601,15 +606,18 @@ export default function IssueReturn({
   stockData,
   onDeductStock,
   onReturnStock,
+  onMarkDamagedStock,
 }: {
   stockData: StockRow[];
   onDeductStock: (equipmentList: { name: string; qty: number }[]) => void;
   onReturnStock: (equipmentList: { name: string; qty: number }[]) => void;
+  onMarkDamagedStock: (equipmentList: { name: string; qty: number }[]) => void;
 }) {
   const [tab, setTab] = useState<TabKey>("issue");
 
   // State หลัก: เก็บสถานะของทุก Event
   const [events, setEvents] = useState<IssueEvent[]>([]);
+  const [equipmentByEvent, setEquipmentByEvent] = useState<Record<string, EventEquipmentItem[]>>({});
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -624,6 +632,8 @@ export default function IssueReturn({
           date: string;
           items: string;
           status: { text: string; tone: string };
+          issueStatus?: EventStatus;
+          equipment?: Array<{ name: string; qty: number }>;
         }>;
 
         const mapped = rows
@@ -638,17 +648,24 @@ export default function IssueReturn({
               eventDate: startDate,
               issueDate: startDate,
               equipment: r.items,
-              status: "ready" as EventStatus,
+              status: r.issueStatus === "inuse" || r.issueStatus === "returned" ? r.issueStatus : "ready",
             };
           });
 
-        setEvents((prev) => {
-          if (prev.length === 0) return mapped;
-          const currentStatus = new Map(prev.map((e) => [e.id, e.status]));
-          return mapped.map((e) => ({ ...e, status: currentStatus.get(e.id) ?? "ready" }));
-        });
+        setEvents(mapped);
+
+        const nextEquipmentByEvent: Record<string, EventEquipmentItem[]> = {};
+        for (const row of rows) {
+          nextEquipmentByEvent[row.id] = Array.isArray(row.equipment)
+            ? row.equipment
+                .filter((item) => item && item.name && typeof item.qty === "number" && item.qty > 0)
+                .map((item) => ({ name: item.name, qty: item.qty }))
+            : [];
+        }
+        setEquipmentByEvent(nextEquipmentByEvent);
       } catch {
         setEvents([]);
+        setEquipmentByEvent({});
       }
     };
     loadEvents();
@@ -688,23 +705,57 @@ export default function IssueReturn({
   const handleIssueClick = (event: IssueEvent) => setConfirmIssueEvent(event);
 
   // ยืนยัน Issue → เปลี่ยน status เป็น "inuse"
-  const handleConfirmIssue = () => {
+  const handleConfirmIssue = async () => {
     if (!confirmIssueEvent) return;
-    setEvents(prev => prev.map(e => e.id === confirmIssueEvent.id ? { ...e, status: "inuse" } : e));
-    setToast(`✅ Issue สำเร็จ: "${confirmIssueEvent.title}"`);
-    setConfirmIssueEvent(null);
-    setTab("inuse"); // ย้ายไปดู tab In Use
+    try {
+      const res = await fetch(`/api/events/${confirmIssueEvent.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueStatus: "inuse" }),
+      });
+      if (!res.ok) throw new Error("failed to update issue status");
+
+      setEvents((prev) => prev.map((e) => e.id === confirmIssueEvent.id ? { ...e, status: "inuse" } : e));
+      setToast(`✅ Issue สำเร็จ: "${confirmIssueEvent.title}"`);
+      setConfirmIssueEvent(null);
+      setTab("inuse"); // ย้ายไปดู tab In Use
+    } catch {
+      setToast("ไม่สามารถบันทึกสถานะ In Use ได้");
+    }
   };
 
   // กด Return → เปิด confirm modal
   const handleReturnClick = (event: IssueEvent) => setConfirmReturnEvent(event);
 
   // ยืนยัน Return → เปลี่ยน status เป็น "returned"
-  const handleConfirmReturn = (damaged: boolean) => {
+  const handleConfirmReturn = async (damaged: boolean, photos: File[]) => {
     if (!confirmReturnEvent) return;
-    setEvents(prev => prev.map(e => e.id === confirmReturnEvent.id ? { ...e, status: "returned" } : e));
-    setToast(`✅ คืนอุปกรณ์สำเร็จ: "${confirmReturnEvent.title}"${damaged ? " (มีความเสียหาย)" : ""}`);
-    setConfirmReturnEvent(null);
+    try {
+      const res = await fetch(`/api/events/${confirmReturnEvent.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueStatus: "returned" }),
+      });
+      if (!res.ok) throw new Error("failed to update issue status");
+
+      const equipment = equipmentByEvent[confirmReturnEvent.id] ?? [];
+      if (equipment.length > 0) {
+        if (damaged) {
+          onMarkDamagedStock(equipment.map((item) => ({ name: item.name, qty: item.qty })));
+        } else {
+          onReturnStock(equipment.map((item) => ({ name: item.name, qty: item.qty })));
+        }
+      }
+      setEvents((prev) => prev.map((e) => e.id === confirmReturnEvent.id ? { ...e, status: "returned" } : e));
+      if (damaged) {
+        setToast(`✅ คืนอุปกรณ์แล้ว (ส่งซ่อม): "${confirmReturnEvent.title}"${photos.length > 0 ? ` • แนบรูป ${photos.length} รูป` : ""}`);
+      } else {
+        setToast(`✅ คืนอุปกรณ์สำเร็จ: "${confirmReturnEvent.title}"`);
+      }
+      setConfirmReturnEvent(null);
+    } catch {
+      setToast("ไม่สามารถบันทึกสถานะ Return ได้");
+    }
   };
 
   // Quick Issue (เบิกเร่งด่วน ไม่ผ่าน Event)
@@ -715,10 +766,18 @@ export default function IssueReturn({
   };
 
   // Quick Return (คืนเร่งด่วน ไม่ผ่าน Event)
-  const handleQuickReturn = (items: EquipmentItem[], damaged: boolean) => {
-    onReturnStock(items.map((i) => ({ name: i.name, qty: i.qty })));
+  const handleQuickReturn = (items: EquipmentItem[], damaged: boolean, photos: File[]) => {
+    if (damaged) {
+      onMarkDamagedStock(items.map((i) => ({ name: i.name, qty: i.qty })));
+    } else {
+      onReturnStock(items.map((i) => ({ name: i.name, qty: i.qty })));
+    }
     const names = items.map(i => i.name).join(", ");
-    setToast(`✅ Quick Return สำเร็จ: ${names}${damaged ? " (มีความเสียหาย)" : ""}`);
+    if (damaged) {
+      setToast(`✅ Quick Return แล้ว (ส่งซ่อม): ${names}${photos.length > 0 ? ` • แนบรูป ${photos.length} รูป` : ""}`);
+    } else {
+      setToast(`✅ Quick Return สำเร็จ: ${names}`);
+    }
   };
 
   return (
@@ -729,7 +788,7 @@ export default function IssueReturn({
       <QuickIssueModal open={isQuickIssueOpen} onClose={() => setIsQuickIssueOpen(false)} onConfirm={handleQuickIssue} equipmentOptions={equipmentOptions} />
       <QuickReturnModal open={isQuickReturnOpen} onClose={() => setIsQuickReturnOpen(false)} onConfirm={handleQuickReturn} equipmentOptions={equipmentOptions} />
       <ConfirmIssueModal open={!!confirmIssueEvent} event={confirmIssueEvent} onConfirm={handleConfirmIssue} onCancel={() => setConfirmIssueEvent(null)} />
-      <ConfirmReturnModal open={!!confirmReturnEvent} event={confirmReturnEvent} onConfirm={(damaged, photos) => handleConfirmReturn(damaged)} onCancel={() => setConfirmReturnEvent(null)} />
+      <ConfirmReturnModal open={!!confirmReturnEvent} event={confirmReturnEvent} onConfirm={(damaged, photos) => handleConfirmReturn(damaged, photos)} onCancel={() => setConfirmReturnEvent(null)} />
 
       <div className="px-6 py-8">
         {/* Header */}

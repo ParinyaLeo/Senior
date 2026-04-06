@@ -9,6 +9,7 @@ function mapEvent(row: EventRow) {
     id: row.id,
     title: row.title,
     status: { text: row.status_text, tone: row.status_tone },
+    issueStatus: row.issue_status,
     code: `#${row.id}`,
     createdAt: row.created_at,
     desc: row.description,
