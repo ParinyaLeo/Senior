@@ -11,7 +11,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-import Events from "./pages/Events";
+import EventsPage from "./features/events/EventsPage";
 import Stock from "./pages/Stock";
 import IssueReturn from "./pages/IssueReturn";
 import Reports from "./pages/Reports";
@@ -490,7 +490,7 @@ export default function AppShell() {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-2">
         {tab === "events" && (
-          <Events
+          <EventsPage
             role={role}
             stockData={stockData}
             onDeductStock={deductStock}
