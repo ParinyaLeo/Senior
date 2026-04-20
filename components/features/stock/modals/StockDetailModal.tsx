@@ -1,0 +1,179 @@
+"use client";
+
+import React from "react";
+import { X } from "lucide-react";
+import type { StockRow } from "../types";
+import { fmt, getCategoryTone, getStatusTone } from "../helpers";
+import StockPill from "../components/StockPill";
+
+type Props = {
+  item: StockRow | null;
+  onClose: () => void;
+};
+
+export default function StockDetailModal({ item, onClose }: Props) {
+  React.useEffect(() => {
+    if (!item) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [item, onClose]);
+
+  if (!item) return null;
+
+  const statusTone = getStatusTone(item.status);
+  const catTone = getCategoryTone(item.category);
+
+  return (
+    <div className="fixed inset-0 z-[120]">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-3 p-5">
+            <div>
+              <div className="text-lg font-semibold text-zinc-900">
+                รายละเอียดอุปกรณ์
+              </div>
+              <div className="mt-1 text-sm text-zinc-500">{item.name}</div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="px-5 pb-5 space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  รหัสอุปกรณ์
+                </div>
+                <div className="flex gap-2">
+                  <StockPill tone="blue">{item.id}</StockPill>
+                  <StockPill tone="blue">{item.code}</StockPill>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  สถานะ
+                </div>
+                <StockPill tone={statusTone}>{item.status}</StockPill>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  ชื่ออุปกรณ์
+                </div>
+                <div className="font-semibold text-zinc-900">{item.name}</div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  ยี่ห้อ
+                </div>
+                <div className="text-zinc-800">{item.brand}</div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  ประเภท
+                </div>
+                <div className="flex gap-2 items-center">
+                  <StockPill tone={catTone}>{item.category}</StockPill>
+                  <span className="text-zinc-500">{item.system}</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  โซนจัดเก็บ
+                </div>
+                <StockPill tone="blue">{item.zone}</StockPill>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  จำนวนรวม
+                </div>
+                <div className="text-lg font-semibold text-zinc-900">
+                  {fmt(item.qty)} ยูนิต
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  จำนวนพร้อมใช้
+                </div>
+                <div className="text-lg font-semibold text-emerald-600">
+                  {fmt(item.available)} ยูนิต
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  ค่าเช่า/วัน
+                </div>
+                <div className="text-lg font-semibold text-zinc-900">
+                  {fmt(item.pricePerDay)} ฿
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold text-zinc-500">
+                  ราคาต้นทุน
+                </div>
+                <div className="text-lg font-semibold text-zinc-900">
+                  {fmt(item.cost)} ฿
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-zinc-50 p-4">
+              <div className="mb-3 text-xs font-semibold text-zinc-700">
+                สรุปการใช้งาน
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="text-2xl font-bold text-zinc-900">
+                    {fmt(item.available)}
+                  </div>
+                  <div className="text-xs text-zinc-500">พร้อมใช้</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-violet-600">
+                    {fmt(item.qty - item.available)}
+                  </div>
+                  <div className="text-xs text-zinc-500">ใช้งานอยู่</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-zinc-900">
+                    {fmt(item.qty)}
+                  </div>
+                  <div className="text-xs text-zinc-500">รวมทั้งหมด</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={onClose}
+                className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
