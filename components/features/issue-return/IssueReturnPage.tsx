@@ -37,6 +37,9 @@ type Props = {
   onDeductStock: (equipmentList: { name: string; qty: number }[]) => void;
   onReturnStock: (equipmentList: { name: string; qty: number }[]) => void;
   onMarkDamagedStock: (equipmentList: { name: string; qty: number }[]) => void;
+  onMarkEventAsIssued?: (eventId: string) => void;
+  // ✅ เพิ่ม prop นี้
+  onUnmarkEventAsIssued?: (eventId: string) => void;
 };
 
 export default function IssueReturnPage({
@@ -44,21 +47,16 @@ export default function IssueReturnPage({
   onDeductStock,
   onReturnStock,
   onMarkDamagedStock,
+  onMarkEventAsIssued,
+  onUnmarkEventAsIssued,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("issue");
-
   const [events, setEvents] = useState<IssueEvent[]>([]);
-  const [equipmentByEvent, setEquipmentByEvent] = useState<
-    Record<string, EventEquipmentItem[]>
-  >({});
-
+  const [equipmentByEvent, setEquipmentByEvent] = useState<Record<string, EventEquipmentItem[]>>({});
   const [isQuickIssueOpen, setIsQuickIssueOpen] = useState(false);
   const [isQuickReturnOpen, setIsQuickReturnOpen] = useState(false);
-  const [confirmIssueEvent, setConfirmIssueEvent] = useState<IssueEvent | null>(
-    null
-  );
-  const [confirmReturnEvent, setConfirmReturnEvent] =
-    useState<IssueEvent | null>(null);
+  const [confirmIssueEvent, setConfirmIssueEvent] = useState<IssueEvent | null>(null);
+  const [confirmReturnEvent, setConfirmReturnEvent] = useState<IssueEvent | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,19 +64,11 @@ export default function IssueReturnPage({
       try {
         const res = await fetch("/api/events");
         if (!res.ok) throw new Error("failed to load events");
-
         const rows = (await res.json()) as Array<{
-          id: string;
-          title: string;
-          code: string;
-          company: string;
-          date: string;
-          items: string;
-          status: { text: string; tone: string };
-          issueStatus?: EventStatus;
-          equipment?: Array<{ name: string; qty: number }>;
+          id: string; title: string; code: string; company: string;
+          date: string; items: string; status: { text: string; tone: string };
+          issueStatus?: EventStatus; equipment?: Array<{ name: string; qty: number }>;
         }>;
-
         setEvents(mapApiEventsToIssueEvents(rows));
         setEquipmentByEvent(mapEquipmentByEvent(rows));
       } catch {
@@ -86,49 +76,52 @@ export default function IssueReturnPage({
         setEquipmentByEvent({});
       }
     };
-
     loadEvents();
   }, []);
 
-  const equipmentOptions = useMemo(
-    () => mapEquipmentOptions(stockData),
-    [stockData]
-  );
+  // ✅ reload เมื่อ Manager อนุมัติใหม่
+  useEffect(() => {
+    const onReload = async () => {
+      try {
+        const res = await fetch("/api/events");
+        if (!res.ok) return;
+        const rows = (await res.json()) as Array<{
+          id: string; title: string; code: string; company: string;
+          date: string; items: string; status: { text: string; tone: string };
+          issueStatus?: EventStatus; equipment?: Array<{ name: string; qty: number }>;
+        }>;
+        setEvents(mapApiEventsToIssueEvents(rows));
+        setEquipmentByEvent(mapEquipmentByEvent(rows));
+      } catch { /* silent */ }
+    };
+    window.addEventListener("app:event:approved", () => {
+      console.log("🔔 app:event:approved received!");
+      onReload();
+    });
+    return () => window.removeEventListener("app:event:approved", onReload);
+  }, []);
 
+  const equipmentOptions = useMemo(() => mapEquipmentOptions(stockData), [stockData]);
   const issueList = useMemo(() => getIssueList(events), [events]);
   const inUseList = useMemo(() => getInUseList(events), [events]);
   const returnList = useMemo(() => getReturnList(events), [events]);
-
-  const visibleList = useMemo(
-    () => getVisibleList(tab, issueList, inUseList, returnList),
-    [tab, issueList, inUseList, returnList]
-  );
-
+  const visibleList = useMemo(() => getVisibleList(tab, issueList, inUseList, returnList), [tab, issueList, inUseList, returnList]);
   const stats = useMemo(() => getIssueReturnStats(events), [events]);
   const emptyText = useMemo(() => getEmptyStateText(tab), [tab]);
 
-  const handleIssueClick = (event: IssueEvent) => {
-    setConfirmIssueEvent(event);
-  };
+  const handleIssueClick = (event: IssueEvent) => setConfirmIssueEvent(event);
 
   const handleConfirmIssue = async () => {
     if (!confirmIssueEvent) return;
-
     try {
       const res = await fetch(`/api/events/${confirmIssueEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ issueStatus: "inuse" }),
       });
-
       if (!res.ok) throw new Error("failed to update issue status");
-
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === confirmIssueEvent.id ? { ...e, status: "inuse" } : e
-        )
-      );
-
+      setEvents((prev) => prev.map((e) => e.id === confirmIssueEvent.id ? { ...e, status: "inuse" } : e));
+      onMarkEventAsIssued?.(confirmIssueEvent.id);
       setToast(`✅ Issue สำเร็จ: "${confirmIssueEvent.title}"`);
       setConfirmIssueEvent(null);
       setTab("inuse");
@@ -137,105 +130,68 @@ export default function IssueReturnPage({
     }
   };
 
-  const handleReturnClick = (event: IssueEvent) => {
-    setConfirmReturnEvent(event);
-  };
+  const handleReturnClick = (event: IssueEvent) => setConfirmReturnEvent(event);
 
   const handleConfirmReturn = async (damaged: boolean, photos: File[]) => {
     if (!confirmReturnEvent) return;
 
     try {
+      // Step 1: บันทึก issueStatus = returned
       const res = await fetch(`/api/events/${confirmReturnEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ issueStatus: "returned" }),
       });
-
       if (!res.ok) throw new Error("failed to update issue status");
 
       const equipment = equipmentByEvent[confirmReturnEvent.id] ?? [];
-
       if (equipment.length > 0) {
         if (damaged) {
-          onMarkDamagedStock(
-            equipment.map((item) => ({
-              name: item.name,
-              qty: item.qty,
-            }))
-          );
+          onMarkDamagedStock(equipment.map((item) => ({ name: item.name, qty: item.qty })));
         } else {
-          onReturnStock(
-            equipment.map((item) => ({
-              name: item.name,
-              qty: item.qty,
-            }))
-          );
+          onReturnStock(equipment.map((item) => ({ name: item.name, qty: item.qty })));
         }
       }
 
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === confirmReturnEvent.id ? { ...e, status: "returned" } : e
-        )
-      );
+      setEvents((prev) => prev.map((e) => e.id === confirmReturnEvent.id ? { ...e, status: "returned" } : e));
+
+      // ✅ แจ้ง EventsPage ให้ reload + ปลดล็อคปุ่มจัดการอุปกรณ์
+      window.dispatchEvent(new CustomEvent("app:event:returned"));
+      onUnmarkEventAsIssued?.(confirmReturnEvent.id);
+
+      // Step 2: reset status กลับเป็น pending
+      fetch(`/api/events/${confirmReturnEvent.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: "pending" }),
+      }).catch(() => {});
 
       if (damaged) {
-        setToast(
-          `✅ คืนอุปกรณ์แล้ว (ส่งซ่อม): "${confirmReturnEvent.title}"${
-            photos.length > 0 ? ` • แนบรูป ${photos.length} รูป` : ""
-          }`
-        );
+        setToast(`✅ คืนอุปกรณ์แล้ว (ส่งซ่อม): "${confirmReturnEvent.title}"${photos.length > 0 ? ` • แนบรูป ${photos.length} รูป` : ""}`);
       } else {
         setToast(`✅ คืนอุปกรณ์สำเร็จ: "${confirmReturnEvent.title}"`);
       }
-
       setConfirmReturnEvent(null);
     } catch {
       setToast("ไม่สามารถบันทึกสถานะ Return ได้");
+      setConfirmReturnEvent(null);
     }
   };
 
   const handleQuickIssue = (items: EquipmentItem[]) => {
-    onDeductStock(
-      items.map((i) => ({
-        name: i.name,
-        qty: i.qty,
-      }))
-    );
-
-    const names = items.map((i) => i.name).join(", ");
-    setToast(`✅ Quick Issue สำเร็จ: ${names}`);
+    onDeductStock(items.map((i) => ({ name: i.name, qty: i.qty })));
+    setToast(`✅ Quick Issue สำเร็จ: ${items.map((i) => i.name).join(", ")}`);
   };
 
-  const handleQuickReturn = (
-    items: EquipmentItem[],
-    damaged: boolean,
-    photos: File[]
-  ) => {
+  const handleQuickReturn = (items: EquipmentItem[], damaged: boolean, photos: File[]) => {
     if (damaged) {
-      onMarkDamagedStock(
-        items.map((i) => ({
-          name: i.name,
-          qty: i.qty,
-        }))
-      );
+      onMarkDamagedStock(items.map((i) => ({ name: i.name, qty: i.qty })));
     } else {
-      onReturnStock(
-        items.map((i) => ({
-          name: i.name,
-          qty: i.qty,
-        }))
-      );
+      onReturnStock(items.map((i) => ({ name: i.name, qty: i.qty })));
     }
-
     const names = items.map((i) => i.name).join(", ");
-
     if (damaged) {
-      setToast(
-        `✅ Quick Return แล้ว (ส่งซ่อม): ${names}${
-          photos.length > 0 ? ` • แนบรูป ${photos.length} รูป` : ""
-        }`
-      );
+      setToast(`✅ Quick Return แล้ว (ส่งซ่อม): ${names}${photos.length > 0 ? ` • แนบรูป ${photos.length} รูป` : ""}`);
     } else {
       setToast(`✅ Quick Return สำเร็จ: ${names}`);
     }
@@ -243,62 +199,18 @@ export default function IssueReturnPage({
 
   return (
     <>
-      {toast && (
-        <IssueReturnToast message={toast} onClose={() => setToast(null)} />
-      )}
+      {toast && <IssueReturnToast message={toast} onClose={() => setToast(null)} />}
 
-      <QuickIssueModal
-        open={isQuickIssueOpen}
-        onClose={() => setIsQuickIssueOpen(false)}
-        onConfirm={handleQuickIssue}
-        equipmentOptions={equipmentOptions}
-      />
-
-      <QuickReturnModal
-        open={isQuickReturnOpen}
-        onClose={() => setIsQuickReturnOpen(false)}
-        onConfirm={handleQuickReturn}
-        equipmentOptions={equipmentOptions}
-      />
-
-      <ConfirmIssueModal
-        open={!!confirmIssueEvent}
-        event={confirmIssueEvent}
-        onConfirm={handleConfirmIssue}
-        onCancel={() => setConfirmIssueEvent(null)}
-      />
-
-      <ConfirmReturnModal
-        open={!!confirmReturnEvent}
-        event={confirmReturnEvent}
-        onConfirm={handleConfirmReturn}
-        onCancel={() => setConfirmReturnEvent(null)}
-      />
+      <QuickIssueModal open={isQuickIssueOpen} onClose={() => setIsQuickIssueOpen(false)} onConfirm={handleQuickIssue} equipmentOptions={equipmentOptions} />
+      <QuickReturnModal open={isQuickReturnOpen} onClose={() => setIsQuickReturnOpen(false)} onConfirm={handleQuickReturn} equipmentOptions={equipmentOptions} />
+      <ConfirmIssueModal open={!!confirmIssueEvent} event={confirmIssueEvent} onConfirm={handleConfirmIssue} onCancel={() => setConfirmIssueEvent(null)} />
+      <ConfirmReturnModal open={!!confirmReturnEvent} event={confirmReturnEvent} onConfirm={handleConfirmReturn} onCancel={() => setConfirmReturnEvent(null)} />
 
       <div className="px-6 py-8">
-        <IssueReturnHeader
-          onOpenQuickIssue={() => setIsQuickIssueOpen(true)}
-          onOpenQuickReturn={() => setIsQuickReturnOpen(true)}
-        />
-
+        <IssueReturnHeader onOpenQuickIssue={() => setIsQuickIssueOpen(true)} onOpenQuickReturn={() => setIsQuickReturnOpen(true)} />
         <IssueReturnStats stats={stats} />
-
-        <IssueReturnTabs
-          tab={tab}
-          issueCount={issueList.length}
-          inUseCount={inUseList.length}
-          returnCount={returnList.length}
-          onChange={setTab}
-        />
-
-        <IssueReturnEventList
-          tab={tab}
-          events={visibleList}
-          emptyText={emptyText}
-          onIssueClick={handleIssueClick}
-          onReturnClick={handleReturnClick}
-        />
-
+        <IssueReturnTabs tab={tab} issueCount={issueList.length} inUseCount={inUseList.length} returnCount={returnList.length} onChange={setTab} />
+        <IssueReturnEventList tab={tab} events={visibleList} emptyText={emptyText} onIssueClick={handleIssueClick} onReturnClick={handleReturnClick} />
         <div className="h-10" />
       </div>
     </>

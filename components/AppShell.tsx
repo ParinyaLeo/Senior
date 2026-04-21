@@ -346,6 +346,8 @@ export default function AppShell() {
 
   const [stockData, setStockData] = useState<StockRow[]>(initialStock);
 
+  const [issuedEventIds, setIssuedEventIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     const loadStock = async () => {
       try {
@@ -454,6 +456,23 @@ export default function AppShell() {
         };
       })
     );
+  };
+
+  const markEventAsIssued = (eventId: string) => {
+    setIssuedEventIds((prev) => {
+      const next = new Set(prev);
+      next.add(eventId);
+      return next;
+    });
+  };
+
+  const unmarkEventAsIssued = (eventId: string) => {
+    setIssuedEventIds((prev) => {
+      if (!prev.has(eventId)) return prev;
+      const next = new Set(prev);
+      next.delete(eventId);
+      return next;
+    });
   };
 
   const isSA = role === "SA";
@@ -677,6 +696,8 @@ export default function AppShell() {
             stockData={stockData}
             onDeductStock={deductStock}
             onReturnStock={returnStock}
+            issuedEventIds={issuedEventIds}
+            onUnmarkIssuedEvent={unmarkEventAsIssued}
           />
         )}
         {tab === "stock" && (
@@ -688,10 +709,13 @@ export default function AppShell() {
         )}
         {tab === "issueReturn" && (
           <IssueReturn
+           key={tab}
             stockData={stockData}
             onDeductStock={deductStock}
             onReturnStock={returnStock}
             onMarkDamagedStock={markDamagedStock}
+            onMarkEventAsIssued={markEventAsIssued}
+            onUnmarkEventAsIssued={unmarkEventAsIssued}
           />
         )}
         {tab === "reports" && <Reports stockData={stockData} />}

@@ -427,8 +427,9 @@ export async function updateEventDecision(payload: {
          items_count = $4,
          status_text = $5,
          status_tone = $6,
-         equipment = $7::jsonb
-       WHERE id = $1`,
+         equipment = $7::jsonb,
+issue_status = CASE WHEN $6 = 'pending' THEN 'ready' ELSE issue_status END
+WHERE id = $1`,
       [
         payload.id,
         payload.startDate,

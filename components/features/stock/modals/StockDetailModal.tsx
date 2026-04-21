@@ -120,7 +120,7 @@ export default function StockDetailModal({ item, onClose }: Props) {
 
               <div>
                 <div className="mb-2 text-xs font-semibold text-zinc-500">
-                  ค่าเช่า/วัน
+                  ค่าบริการ/วัน
                 </div>
                 <div className="text-lg font-semibold text-zinc-900">
                   {fmt(item.pricePerDay)} ฿

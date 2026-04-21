@@ -34,7 +34,7 @@ export default function StockTable({
               <th className="px-6 py-4">จัดเก็บ</th>
               <th className="px-6 py-4">สถานะ</th>
               <th className="px-6 py-4 text-center">จำนวน</th>
-              <th className="px-6 py-4 text-center">ค่าเช่า/วัน</th>
+              <th className="px-6 py-4 text-center">ค่าบริการ/วัน</th>
               <th className="px-6 py-4 text-center">ราคาต้นทุน</th>
               <th className="px-6 py-4 text-center">จัดการ</th>
             </tr>

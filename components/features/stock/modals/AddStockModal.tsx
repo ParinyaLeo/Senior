@@ -65,12 +65,12 @@ export default function AddStockModal({
       e.qty = "จำนวนต้องเป็นตัวเลขมากกว่า 0";
     }
 
-    if (!form.pricePerDay.trim()) e.pricePerDay = "กรุณาระบุค่าเช่า/วัน";
+    if (!form.pricePerDay.trim()) e.pricePerDay = "กรุณาระบุค่าบริการ/วัน";
     if (
       form.pricePerDay.trim() &&
       (Number.isNaN(Number(form.pricePerDay)) || Number(form.pricePerDay) < 0)
     ) {
-      e.pricePerDay = "ค่าเช่าต้องเป็นตัวเลข";
+      e.pricePerDay = "ค่าบริการต้องเป็นตัวเลข";
     }
 
     if (!form.cost.trim()) e.cost = "กรุณาระบุราคาต้นทุน";
@@ -226,13 +226,13 @@ export default function AddStockModal({
                 />
               </StockField>
 
-              <StockField label="ค่าเช่า/วัน (บาท)" required error={errors.pricePerDay}>
+              <StockField label="ค่าบริการ/วัน (บาท)" required error={errors.pricePerDay}>
                 <input
                   value={form.pricePerDay}
                   onChange={(e) =>
                     setForm((s) => ({ ...s, pricePerDay: e.target.value }))
                   }
-                  placeholder="ระบุค่าเช่าต่อวัน"
+                  placeholder="ระบุค่าบริการต่อวัน"
                   className={inp(errors.pricePerDay)}
                 />
               </StockField>

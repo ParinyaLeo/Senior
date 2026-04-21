@@ -15,14 +15,15 @@ export type EventItem = {
   items: string;
 
   organizer?: string;
-
-  // ✅ เพิ่ม 2 ตัวนี้
   contactName?: string;
   contactPhone?: string;
-
   branchCode?: string;
   budgetTHB?: number;
   attendees?: number;
+
+  // ✅ เพิ่ม: ติดตามว่า stockkeeper Issue ไปแล้วหรือยัง
+  // ถ้า true = ล็อคปุ่มแก้ไขอุปกรณ์
+  isIssued?: boolean;
 };
 
 export type SelectedEquipment = {
@@ -51,11 +52,8 @@ export type CreateForm = {
   eventName: string;
   companyName: string;
   organizerName: string;
-
-  // ✅ เพิ่ม
   contactName: string;
   contactPhone: string;
-
   branchCode: string;
   budgetTHB: string;
   description: string;

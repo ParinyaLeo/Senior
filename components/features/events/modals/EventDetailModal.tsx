@@ -291,7 +291,7 @@ export default function EventDetailModal({
                           </div>
                         </div>
                         <div>
-                          <div className="text-xs text-zinc-400">ค่าเช่า/วัน</div>
+                          <div className="text-xs text-zinc-400">ค่าบริการ/วัน</div>
                           <div className="mt-1 font-semibold text-zinc-900">
                             {formatTHB(item.pricePerDayTHB)} บาท
                           </div>

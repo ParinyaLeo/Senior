@@ -1,10 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, ChevronDown, Package, Plus, X } from "lucide-react";
+import { Boxes, ChevronDown, Clock, Package, Plus, X } from "lucide-react";
 import type { StockRow } from "../../../AppShell";
 import type { SelectedEquipment } from "../types";
 import { formatTHB, toDateLocal } from "../helpers";
+
+// ─── Type ประวัติการแก้ไข ─────────────────────────────────────────────────
+type HistoryEntry = {
+  id: string;
+  action: "เพิ่ม" | "ลบ";
+  equipmentName: string;
+  qty: number;
+  timestamp: Date;
+};
 
 export default function ManageEquipmentModal({
   open,
@@ -40,6 +49,9 @@ export default function ManageEquipmentModal({
   const [selectErrors, setSelectErrors] = useState<{ name?: string; qty?: string }>({});
   const [isEquipOpen, setIsEquipOpen] = useState(false);
   const [isDecisionOpen, setIsDecisionOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  // ✅ เก็บประวัติการแก้ไข
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const equipRef = useRef<HTMLDivElement | null>(null);
 
   const equipmentOptions = useMemo(() => {
@@ -63,6 +75,9 @@ export default function ManageEquipmentModal({
     setStartDate(startDateInitial);
     setEndDate(endDateInitial);
     setEquipment(initialEquipment);
+    // ✅ reset history เมื่อเปิด modal ใหม่
+    setHistory([]);
+    setShowHistory(false);
   }, [open, startDateInitial, endDateInitial, initialEquipment]);
 
   useEffect(() => {
@@ -141,41 +156,46 @@ export default function ManageEquipmentModal({
       return next;
     });
 
+    // ✅ บันทึกประวัติ เพิ่มอุปกรณ์
+    setHistory((prev) => [
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        action: "เพิ่ม",
+        equipmentName: selectedOption.name,
+        qty: q,
+        timestamp: new Date(),
+      },
+      ...prev,
+    ]);
+
     setIsSelectOpen(false);
   };
 
   const removeEquipmentAt = (idx: number) => {
+    const removed = equipment[idx];
     setEquipment((prev) => prev.filter((_, i) => i !== idx));
+
+    // ✅ บันทึกประวัติ ลบอุปกรณ์
+    setHistory((prev) => [
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        action: "ลบ",
+        equipmentName: removed.name,
+        qty: removed.qty,
+        timestamp: new Date(),
+      },
+      ...prev,
+    ]);
   };
 
-  const totalQty = useMemo(
-    () => equipment.reduce((sum, it) => sum + it.qty, 0),
-    [equipment]
-  );
-  const uniqueTypes = useMemo(
-    () => new Set(equipment.map((x) => x.name)).size,
-    [equipment]
-  );
-  const totalCostPerDay = useMemo(
-    () => equipment.reduce((sum, it) => sum + it.qty * it.pricePerDayTHB, 0),
-    [equipment]
-  );
-  const insufficientItems = useMemo(
-    () => equipment.filter((it) => it.qty > it.available),
-    [equipment]
-  );
+  const totalQty = useMemo(() => equipment.reduce((sum, it) => sum + it.qty, 0), [equipment]);
+  const uniqueTypes = useMemo(() => new Set(equipment.map((x) => x.name)).size, [equipment]);
+  const totalCostPerDay = useMemo(() => equipment.reduce((sum, it) => sum + it.qty * it.pricePerDayTHB, 0), [equipment]);
+  const insufficientItems = useMemo(() => equipment.filter((it) => it.qty > it.available), [equipment]);
   const hasInsufficient = insufficientItems.length > 0;
 
   const save = () => {
     if (!validate()) return;
-    if (hasInsufficient) {
-      alert(
-        `มีอุปกรณ์ไม่เพียงพอ\n\n${insufficientItems
-          .map((item) => `- ${item.name} (ต้องใช้ ${item.qty} / มี ${item.available})`)
-          .join("\n")}`
-      );
-      return;
-    }
     setIsDecisionOpen(true);
   };
 
@@ -192,19 +212,13 @@ export default function ManageEquipmentModal({
       <div className="fixed inset-0 z-[120]">
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
         <div className="absolute inset-0 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-2xl">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-3 p-5">
               <div className="min-w-0">
                 <div className="truncate text-lg font-semibold text-zinc-900">{eventTitle}</div>
-                <div className="mt-1 text-sm text-zinc-500">
-                  เลือกอุปกรณ์และกำหนดวันเบิก/คืนก่อนอนุมัติ Event
-                </div>
+                <div className="mt-1 text-sm text-zinc-500">เลือกอุปกรณ์และกำหนดวันเบิก/คืนก่อนอนุมัติ Event</div>
               </div>
-              <button
-                onClick={onClose}
-                className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-                title="Close"
-              >
+              <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" title="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -212,62 +226,29 @@ export default function ManageEquipmentModal({
             <div className="px-5 pb-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <div className="mb-1 text-xs font-semibold text-zinc-700">
-                    วันเบิกอุปกรณ์ <span className="text-red-600">*</span>
-                  </div>
-                  <input
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    type="date"
-                    className={[
-                      "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                      errors.startDate
-                        ? "border-red-300 ring-2 ring-red-100"
-                        : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                    ].join(" ")}
-                  />
-                  {errors.startDate ? (
-                    <div className="mt-1 text-xs text-red-600">{errors.startDate}</div>
-                  ) : null}
+                  <div className="mb-1 text-xs font-semibold text-zinc-700">วันเบิกอุปกรณ์ <span className="text-red-600">*</span></div>
+                  <input value={startDate} onChange={(e) => setStartDate(e.target.value)} type="date"
+                    className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.startDate ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+                  {errors.startDate && <div className="mt-1 text-xs text-red-600">{errors.startDate}</div>}
                 </div>
-
                 <div>
-                  <div className="mb-1 text-xs font-semibold text-zinc-700">
-                    วันคืนอุปกรณ์ <span className="text-red-600">*</span>
-                  </div>
-                  <input
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    type="date"
-                    className={[
-                      "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                      errors.endDate
-                        ? "border-red-300 ring-2 ring-red-100"
-                        : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
-                    ].join(" ")}
-                  />
-                  {errors.endDate ? (
-                    <div className="mt-1 text-xs text-red-600">{errors.endDate}</div>
-                  ) : null}
+                  <div className="mb-1 text-xs font-semibold text-zinc-700">วันคืนอุปกรณ์ <span className="text-red-600">*</span></div>
+                  <input value={endDate} onChange={(e) => setEndDate(e.target.value)} type="date"
+                    className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", errors.endDate ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-200"].join(" ")} />
+                  {errors.endDate && <div className="mt-1 text-xs text-red-600">{errors.endDate}</div>}
                 </div>
               </div>
 
               <div className="mt-5 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-zinc-900">
-                  อุปกรณ์ที่เลือก ({equipment.length})
-                </div>
-                <button
-                  onClick={openSelect}
-                  className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  เพิ่มอุปกรณ์
+                <div className="text-sm font-semibold text-zinc-900">อุปกรณ์ที่เลือก ({equipment.length})</div>
+                <button onClick={openSelect} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700">
+                  <Plus className="h-4 w-4" />เพิ่มอุปกรณ์
                 </button>
               </div>
 
               {hasInsufficient && (
                 <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  มีอุปกรณ์ไม่เพียงพอ กรุณาตรวจสอบรายการที่ขึ้นสถานะ "ไม่พอ" ก่อนบันทึกและอนุมัติ
+                  ⚠️ มีอุปกรณ์ไม่เพียงพอ สามารถอนุมัติได้ แต่กรุณาตรวจสอบรายการที่ขึ้นสถานะ "ไม่พอ"
                 </div>
               )}
 
@@ -277,22 +258,14 @@ export default function ManageEquipmentModal({
                     <Boxes className="h-6 w-6" />
                   </div>
                   <div className="mt-3 text-sm font-semibold text-zinc-800">ยังไม่ได้เลือกอุปกรณ์</div>
-                  <div className="mt-1 text-sm text-zinc-500">
-                    คลิกปุ่ม "เพิ่มอุปกรณ์" เพื่อเริ่มเลือกอุปกรณ์
-                  </div>
+                  <div className="mt-1 text-sm text-zinc-500">คลิกปุ่ม "เพิ่มอุปกรณ์" เพื่อเริ่มเลือกอุปกรณ์</div>
                 </div>
               ) : (
                 <div className="mt-3 space-y-3">
                   {equipment.map((it, idx) => {
                     const enough = it.qty <= it.available;
                     return (
-                      <div
-                        key={`${it.name}-${idx}`}
-                        className={[
-                          "rounded-2xl border bg-white p-4 shadow-sm",
-                          enough ? "border-zinc-200" : "border-rose-300 bg-rose-50/40",
-                        ].join(" ")}
-                      >
+                      <div key={`${it.name}-${idx}`} className={["rounded-2xl border bg-white p-4 shadow-sm", enough ? "border-zinc-200" : "border-rose-300 bg-rose-50/40"].join(" ")}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-3">
@@ -300,53 +273,32 @@ export default function ManageEquipmentModal({
                                 <Package className="h-4 w-4" />
                               </div>
                               <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-zinc-900">
-                                  {it.name}
-                                </div>
+                                <div className="truncate text-sm font-semibold text-zinc-900">{it.name}</div>
                                 <div className="mt-0.5 text-xs text-zinc-500">{it.category}</div>
                               </div>
                             </div>
                           </div>
-
                           <div className="flex items-center gap-2">
-                            <span
-                              className={[
-                                "rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
-                                enough
-                                  ? "bg-emerald-100 text-emerald-700 ring-emerald-200"
-                                  : "bg-rose-100 text-rose-700 ring-rose-200",
-                              ].join(" ")}
-                            >
+                            <span className={["rounded-full px-2.5 py-1 text-xs font-semibold ring-1", enough ? "bg-emerald-100 text-emerald-700 ring-emerald-200" : "bg-rose-100 text-rose-700 ring-rose-200"].join(" ")}>
                               {enough ? "พอ" : "ไม่พอ"}
                             </span>
-                            <button
-                              onClick={() => removeEquipmentAt(idx)}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-red-600 hover:bg-red-50"
-                              title="ลบ"
-                            >
+                            <button onClick={() => removeEquipmentAt(idx)} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-red-600 hover:bg-red-50" title="ลบ">
                               <X className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
-
                         <div className="mt-3 grid grid-cols-3 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
                           <div>
                             <div className="text-xs text-zinc-500">จำนวน / มีอยู่</div>
-                            <div className="mt-1 text-sm font-semibold text-zinc-900">
-                              {it.qty} / {it.available}
-                            </div>
+                            <div className="mt-1 text-sm font-semibold text-zinc-900">{it.qty} / {it.available}</div>
                           </div>
                           <div>
-                            <div className="text-xs text-zinc-500">ค่าเช่า/วัน</div>
-                            <div className="mt-1 text-sm font-semibold text-zinc-900">
-                              {formatTHB(it.pricePerDayTHB)} บาท
-                            </div>
+                            <div className="text-xs text-zinc-500">ค่าบริการ/วัน</div>
+                            <div className="mt-1 text-sm font-semibold text-zinc-900">{formatTHB(it.pricePerDayTHB)} บาท</div>
                           </div>
                           <div>
                             <div className="text-xs text-zinc-500">รวม (1 วัน)</div>
-                            <div className="mt-1 text-sm font-semibold text-blue-600">
-                              {formatTHB(it.qty * it.pricePerDayTHB)} บาท
-                            </div>
+                            <div className="mt-1 text-sm font-semibold text-blue-600">{formatTHB(it.qty * it.pricePerDayTHB)} บาท</div>
                           </div>
                         </div>
                       </div>
@@ -361,40 +313,55 @@ export default function ManageEquipmentModal({
                       </div>
                       <div className="text-center">
                         <div className="text-xs text-zinc-500">จำนวนทั้งหมด</div>
-                        <div className="mt-1 text-sm font-semibold text-blue-600">
-                          {formatTHB(totalQty)} ชิ้น
-                        </div>
+                        <div className="mt-1 text-sm font-semibold text-blue-600">{formatTHB(totalQty)} ชิ้น</div>
                       </div>
                       <div className="text-center">
                         <div className="text-xs text-zinc-500">ค่าใช้จ่ายรวม (โดยประมาณ)</div>
-                        <div className="mt-1 text-sm font-semibold text-red-600">
-                          {formatTHB(totalCostPerDay)} บาท
-                        </div>
+                        <div className="mt-1 text-sm font-semibold text-red-600">{formatTHB(totalCostPerDay)} บาท</div>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* ✅ ประวัติการแก้ไขอุปกรณ์ */}
+              {history.length > 0 && (
+                <div className="mt-5">
+                  <button
+                    onClick={() => setShowHistory((v) => !v)}
+                    className="flex items-center gap-2 text-sm font-semibold text-zinc-700 hover:text-zinc-900"
+                  >
+                    <Clock className="h-4 w-4 text-zinc-400" />
+                    ประวัติการแก้ไข ({history.length})
+                    <span className="text-xs text-zinc-400">{showHistory ? "▲ ซ่อน" : "▼ ดู"}</span>
+                  </button>
+
+                  {showHistory && (
+                    <div className="mt-3 space-y-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                      {history.map((h) => (
+                        <div key={h.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <span className={["rounded-full px-2.5 py-1 text-xs font-semibold ring-1", h.action === "เพิ่ม" ? "bg-emerald-100 text-emerald-700 ring-emerald-200" : "bg-red-100 text-red-700 ring-red-200"].join(" ")}>
+                              {h.action}
+                            </span>
+                            <div>
+                              <div className="text-sm font-medium text-zinc-900">{h.equipmentName}</div>
+                              <div className="text-xs text-zinc-500">จำนวน {h.qty} ชิ้น</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-zinc-400">
+                            {h.timestamp.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mt-6 flex items-center justify-end gap-3">
-                <button
-                  onClick={onClose}
-                  className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  onClick={save}
-                  disabled={hasInsufficient}
-                  className={[
-                    "h-10 rounded-xl px-4 text-sm font-semibold text-white shadow-sm",
-                    hasInsufficient
-                      ? "cursor-not-allowed bg-zinc-300"
-                      : "bg-red-600 hover:bg-red-700",
-                  ].join(" ")}
-                >
-                  บันทึกและอนุมัติ
-                </button>
+                <button onClick={onClose} className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">ยกเลิก</button>
+                <button onClick={save} className="h-10 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-red-700">บันทึกและอนุมัติ</button>
               </div>
             </div>
           </div>
@@ -403,77 +370,39 @@ export default function ManageEquipmentModal({
 
       {isSelectOpen && (
         <div className="fixed inset-0 z-[130]">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setIsSelectOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsSelectOpen(false)} />
           <div className="absolute inset-0 flex items-center justify-center p-4">
             <div className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white shadow-2xl">
               <div className="flex items-start justify-between gap-3 p-5">
                 <div>
                   <div className="text-lg font-semibold text-zinc-900">Select Equipment</div>
-                  <div className="mt-1 text-sm text-zinc-500">
-                    Choose equipment and specify quantity
-                  </div>
+                  <div className="mt-1 text-sm text-zinc-500">Choose equipment and specify quantity</div>
                 </div>
-                <button
-                  onClick={() => setIsSelectOpen(false)}
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-                  title="Close"
-                >
+                <button onClick={() => setIsSelectOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" title="Close">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-
               <div className="px-5 pb-5">
                 <div ref={equipRef} className="relative">
                   <div className="mb-1 text-xs font-semibold text-zinc-700">Equipment</div>
-                  <button
-                    onClick={() => setIsEquipOpen((v) => !v)}
-                    type="button"
-                    className={[
-                      "flex h-10 w-full items-center justify-between rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900",
-                      selectErrors.name
-                        ? "border-red-300 ring-2 ring-red-100"
-                        : "border-zinc-200",
-                    ].join(" ")}
-                  >
+                  <button onClick={() => setIsEquipOpen((v) => !v)} type="button"
+                    className={["flex h-10 w-full items-center justify-between rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900", selectErrors.name ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200"].join(" ")}>
                     <span className={selectedName ? "text-zinc-900" : "text-zinc-500"}>
-                      {selectedName
-                        ? `${selectedName} (Available: ${selectedOption?.available ?? "-"})`
-                        : "Select equipment"}
+                      {selectedName ? `${selectedName} (Available: ${selectedOption?.available ?? "-"})` : "Select equipment"}
                     </span>
                     <ChevronDown className="h-4 w-4 text-zinc-500" />
                   </button>
-
-                  {selectErrors.name ? (
-                    <div className="mt-1 text-xs text-red-600">{selectErrors.name}</div>
-                  ) : null}
-
+                  {selectErrors.name && <div className="mt-1 text-xs text-red-600">{selectErrors.name}</div>}
                   {isEquipOpen && (
                     <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[140] rounded-xl border border-zinc-200 bg-white shadow-lg">
                       <div className="max-h-[260px] overflow-auto p-1">
                         {equipmentOptions.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-zinc-500">
-                            ไม่มีอุปกรณ์ที่พร้อมใช้
-                          </div>
+                          <div className="px-3 py-2 text-sm text-zinc-500">ไม่มีอุปกรณ์ที่พร้อมใช้</div>
                         ) : (
                           equipmentOptions.map((opt) => (
-                            <button
-                              key={opt.name}
-                              type="button"
-                              onClick={() => {
-                                setSelectedName(opt.name);
-                                setSelectErrors((s) => ({ ...s, name: undefined }));
-                                setIsEquipOpen(false);
-                              }}
-                              className={[
-                                "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition",
-                                opt.name === selectedName
-                                  ? "bg-zinc-100 text-zinc-900"
-                                  : "text-zinc-700 hover:bg-zinc-50",
-                              ].join(" ")}
-                            >
+                            <button key={opt.name} type="button"
+                              onClick={() => { setSelectedName(opt.name); setSelectErrors((s) => ({ ...s, name: undefined })); setIsEquipOpen(false); }}
+                              className={["flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition", opt.name === selectedName ? "bg-zinc-100 text-zinc-900" : "text-zinc-700 hover:bg-zinc-50"].join(" ")}>
                               {opt.name} (Available: {opt.available})
                             </button>
                           ))
@@ -482,38 +411,15 @@ export default function ManageEquipmentModal({
                     </div>
                   )}
                 </div>
-
                 <div className="mt-4">
                   <div className="mb-1 text-xs font-semibold text-zinc-700">Quantity</div>
-                  <input
-                    value={qty}
-                    onChange={(e) => setQty(e.target.value)}
-                    placeholder="Enter quantity"
-                    className={[
-                      "h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none",
-                      selectErrors.qty
-                        ? "border-red-300 ring-2 ring-red-100"
-                        : "border-zinc-200",
-                    ].join(" ")}
-                  />
-                  {selectErrors.qty ? (
-                    <div className="mt-1 text-xs text-red-600">{selectErrors.qty}</div>
-                  ) : null}
+                  <input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Enter quantity"
+                    className={["h-10 w-full rounded-xl border bg-zinc-50 px-3 text-sm text-zinc-900 outline-none", selectErrors.qty ? "border-red-300 ring-2 ring-red-100" : "border-zinc-200"].join(" ")} />
+                  {selectErrors.qty && <div className="mt-1 text-xs text-red-600">{selectErrors.qty}</div>}
                 </div>
-
                 <div className="mt-6 flex items-center justify-end gap-3">
-                  <button
-                    onClick={() => setIsSelectOpen(false)}
-                    className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={addSelected}
-                    className="h-10 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800"
-                  >
-                    Add
-                  </button>
+                  <button onClick={() => setIsSelectOpen(false)} className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">Cancel</button>
+                  <button onClick={addSelected} className="h-10 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800">Add</button>
                 </div>
               </div>
             </div>
@@ -523,33 +429,20 @@ export default function ManageEquipmentModal({
 
       {isDecisionOpen && (
         <div className="fixed inset-0 z-[170]">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setIsDecisionOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsDecisionOpen(false)} />
           <div className="absolute inset-0 flex items-center justify-center p-4">
             <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl">
               <div className="text-lg font-semibold text-zinc-900">ยืนยันการบันทึกผล</div>
               <div className="mt-2 text-sm text-zinc-500">ต้องการบันทึก Event นี้เป็นแบบไหน</div>
+              {hasInsufficient && (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  ⚠️ มีอุปกรณ์ไม่เพียงพอ {insufficientItems.length} รายการ ยืนยันจะอนุมัติต่อไปใช่ไหม?
+                </div>
+              )}
               <div className="mt-5 grid grid-cols-1 gap-3">
-                <button
-                  onClick={() => handleDecision("approved")}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
-                >
-                  อนุมัติ
-                </button>
-                <button
-                  onClick={() => handleDecision("rejected")}
-                  className="rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700"
-                >
-                  ไม่อนุมัติ
-                </button>
-                <button
-                  onClick={() => setIsDecisionOpen(false)}
-                  className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
-                >
-                  ยกเลิก
-                </button>
+                <button onClick={() => handleDecision("approved")} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700">อนุมัติ</button>
+                <button onClick={() => handleDecision("rejected")} className="rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700">ไม่อนุมัติ</button>
+                <button onClick={() => setIsDecisionOpen(false)} className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">ยกเลิก</button>
               </div>
             </div>
           </div>

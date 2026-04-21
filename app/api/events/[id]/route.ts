@@ -13,6 +13,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const { id } = await context.params;
   const body = await req.json().catch(() => null);
 
+  // ─── Case 1: อัปเดต issueStatus (inuse / returned / ready) ───────────────
   if (body?.issueStatus) {
     if (!["ready", "inuse", "returned"].includes(body.issueStatus)) {
       return NextResponse.json({ error: "invalid issueStatus" }, { status: 400 });
@@ -35,6 +36,32 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return NextResponse.json({ ok: true });
   }
 
+  // ─── Case 2: Reset status กลับเป็น pending (หลัง Return) ─────────────────
+  // ✅ รองรับกรณีส่งแค่ decision: "pending" โดยไม่ต้องมี startDate/endDate/equipment
+  if (body?.decision === "pending") {
+    const current = await getEventById(id);
+    if (!current) {
+      return NextResponse.json({ error: "event not found" }, { status: 404 });
+    }
+
+    const rowCount = await updateEventDecision({
+      id,
+      startDate: current.start_date,
+      endDate: current.end_date,
+      itemsCount: current.items_count,
+      statusText: "รออนุมัติ",
+      statusTone: "pending",
+      equipment: Array.isArray(current.equipment) ? current.equipment : [],
+    });
+
+    if (rowCount === 0) {
+      return NextResponse.json({ error: "event not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  // ─── Case 3: อนุมัติ / ไม่อนุมัติ Event (ต้องมี startDate, endDate, equipment) ───
   if (!body?.startDate || !body?.endDate || !Array.isArray(body?.equipment) || !body?.decision) {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });
   }
