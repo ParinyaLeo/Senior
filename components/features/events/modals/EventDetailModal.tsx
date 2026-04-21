@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ClipboardList,
   MapPin,
+  Phone,
   User,
   Users,
   Wallet,
@@ -40,18 +41,18 @@ export default function EventDetailModal({
 
   const { startStr, endStr } = parseDateRange(event.date);
 
-const startDateRaw = startStr ? toDateLocal(startStr) : null;
-const endDateRaw = endStr ? toDateLocal(endStr) : null;
+  const startDateRaw = startStr ? toDateLocal(startStr) : null;
+  const endDateRaw = endStr ? toDateLocal(endStr) : null;
 
-const startDate =
-  startDateRaw && !Number.isNaN(startDateRaw.getTime())
-    ? startDateRaw
-    : null;
+  const startDate =
+    startDateRaw && !Number.isNaN(startDateRaw.getTime())
+      ? startDateRaw
+      : null;
 
-const endDate =
-  endDateRaw && !Number.isNaN(endDateRaw.getTime())
-    ? endDateRaw
-    : null;
+  const endDate =
+    endDateRaw && !Number.isNaN(endDateRaw.getTime())
+      ? endDateRaw
+      : null;
 
   const eventDays =
     startDate && endDate
@@ -69,7 +70,8 @@ const endDate =
     (sum, it) => sum + it.qty * it.pricePerDayTHB,
     0
   );
-  const totalCost = eventDays > 0 ? totalCostPerDay * eventDays : totalCostPerDay;
+  const totalCost =
+    eventDays > 0 ? totalCostPerDay * eventDays : totalCostPerDay;
 
   const fmtDate = (d: Date | null) =>
     d
@@ -93,7 +95,9 @@ const endDate =
               <div className="text-lg font-semibold text-zinc-900">รายละเอียด Event</div>
               <div className="mt-1 text-sm text-zinc-500">ข้อมูลพื้นฐานของ Event</div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <div className="truncate text-xl font-semibold text-zinc-900">{event.title}</div>
+                <div className="truncate text-xl font-semibold text-zinc-900">
+                  {event.title}
+                </div>
                 <EventStatusPill tone={event.status.tone} text={event.status.text} />
                 <span className="text-sm text-zinc-500">{event.code}</span>
               </div>
@@ -164,10 +168,26 @@ const endDate =
 
                 <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-zinc-500">
                   <User className="h-4 w-4" />
-                  ผู้จัด
+                  Customer Name
                 </div>
                 <div className="mt-1 text-sm font-semibold text-zinc-900">
                   {event.organizer || "-"}
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                  <User className="h-4 w-4" />
+                  Contact Name
+                </div>
+                <div className="mt-1 text-sm font-semibold text-zinc-900">
+                  {event.contactName || "-"}
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                  <Phone className="h-4 w-4" />
+                  Contact Phone
+                </div>
+                <div className="mt-1 text-sm font-semibold text-zinc-900">
+                  {event.contactPhone || "-"}
                 </div>
 
                 <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-zinc-500">

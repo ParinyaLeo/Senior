@@ -13,7 +13,13 @@ export type EventItem = {
   place: string;
   date: string;
   items: string;
+
   organizer?: string;
+
+  // ✅ เพิ่ม 2 ตัวนี้
+  contactName?: string;
+  contactPhone?: string;
+
   branchCode?: string;
   budgetTHB?: number;
   attendees?: number;
@@ -45,6 +51,11 @@ export type CreateForm = {
   eventName: string;
   companyName: string;
   organizerName: string;
+
+  // ✅ เพิ่ม
+  contactName: string;
+  contactPhone: string;
+
   branchCode: string;
   budgetTHB: string;
   description: string;

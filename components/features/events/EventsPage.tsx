@@ -133,6 +133,8 @@ export default function EventsPage({
               date: safeDate,
               items: r.items,
               organizer: r.organizer,
+              contactName: r.contactName,
+              contactPhone: r.contactPhone,
               branchCode: r.branchCode,
               budgetTHB: r.budgetTHB,
               attendees: r.attendees,
@@ -253,6 +255,8 @@ export default function EventsPage({
             e.place,
             e.desc,
             e.organizer ?? "",
+            e.contactName ?? "",
+            e.contactPhone ?? "",
             e.code,
           ]
             .join(" ")
@@ -308,7 +312,7 @@ export default function EventsPage({
     const m = monthCursor.getMonth();
 
     const first = new Date(y, m, 1);
-    const last = new Date(y, m + 0 + 1, 0);
+    const last = new Date(y, m + 1, 0);
 
     const startOffset = first.getDay();
     const totalDays = last.getDate();
@@ -433,6 +437,8 @@ export default function EventsPage({
     title: string;
     company: string;
     organizer: string;
+    contactName: string;
+    contactPhone: string;
     branchCode?: string;
     budgetTHB?: number;
     desc?: string;
@@ -442,10 +448,25 @@ export default function EventsPage({
     endDate: string;
   }) => {
     try {
+      const body = {
+        title: payload.title,
+        company: payload.company,
+        organizer: payload.organizer,
+        contactName: payload.contactName,
+        contactPhone: payload.contactPhone,
+        branchCode: payload.branchCode,
+        budgetTHB: payload.budgetTHB,
+        desc: payload.desc,
+        attendees: payload.attendees,
+        place: payload.place,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+      };
+
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) throw new Error("failed to create event");
@@ -467,6 +488,8 @@ export default function EventsPage({
         items: "0 รายการ",
         status: { text: "รออนุมัติ", tone: "pending" },
         organizer: payload.organizer,
+        contactName: payload.contactName,
+        contactPhone: payload.contactPhone,
         branchCode: payload.branchCode,
         budgetTHB: payload.budgetTHB,
         attendees: payload.attendees,
@@ -483,7 +506,7 @@ export default function EventsPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: "Event ใหม่รออนุมัติ",
-            message: `${payload.title} สร้างโดย SA รอการอนุมัติ`,
+            message: `${payload.title} สร้างโดย Customer รอการอนุมัติ`,
             audience: ["Manager"],
           }),
         }).catch(() => {});

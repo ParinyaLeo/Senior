@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Plus, X } from "lucide-react";
 import type { CreateForm } from "../types";
 import { toDateLocal } from "../helpers";
 
@@ -49,6 +49,7 @@ function CompanyDropdown({
   required,
   value,
   onChange,
+  onAddOption,
   placeholder,
   options,
   error,
@@ -57,6 +58,7 @@ function CompanyDropdown({
   required?: boolean;
   value: string;
   onChange: (v: string) => void;
+  onAddOption: (v: string) => void;
   placeholder?: string;
   options: string[];
   error?: string;
@@ -80,11 +82,21 @@ function CompanyDropdown({
     };
   }, [open]);
 
+  const trimmedValue = value.trim();
+
   const filtered = useMemo(() => {
-    const needle = value.trim().toLowerCase();
+    const needle = trimmedValue.toLowerCase();
     if (!needle) return options;
     return options.filter((opt) => opt.toLowerCase().includes(needle));
-  }, [options, value]);
+  }, [options, trimmedValue]);
+
+  const exactExists = useMemo(() => {
+    return options.some(
+      (opt) => opt.trim().toLowerCase() === trimmedValue.toLowerCase()
+    );
+  }, [options, trimmedValue]);
+
+  const canAddNew = trimmedValue.length > 0 && !exactExists;
 
   return (
     <div ref={ref} className="relative">
@@ -113,29 +125,51 @@ function CompanyDropdown({
         className="absolute inset-y-0 right-2 grid place-items-center text-zinc-400 hover:text-zinc-600"
         aria-label="Toggle"
       >
-        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
         <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 rounded-xl border border-zinc-200 bg-white shadow-lg">
           <div className="max-h-56 overflow-auto py-1">
-            {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-zinc-500">No companies found</div>
+            {filtered.length === 0 && !canAddNew ? (
+              <div className="px-3 py-2 text-sm text-zinc-500">
+                No companies found
+              </div>
             ) : (
-              filtered.map((opt) => (
-                <button
-                  type="button"
-                  key={opt}
-                  onClick={() => {
-                    onChange(opt);
-                    setOpen(false);
-                  }}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50"
-                >
-                  <span className="truncate">{opt}</span>
-                  {opt === value ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : null}
-                </button>
-              ))
+              <>
+                {filtered.map((opt) => (
+                  <button
+                    type="button"
+                    key={opt}
+                    onClick={() => {
+                      onChange(opt);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50"
+                  >
+                    <span className="truncate">{opt}</span>
+                    {opt.trim().toLowerCase() === trimmedValue.toLowerCase() ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : null}
+                  </button>
+                ))}
+
+                {canAddNew && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddOption(trimmedValue);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-emerald-600 hover:bg-emerald-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="truncate">เพิ่มบริษัท "{trimmedValue}"</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -181,6 +215,8 @@ export default function CreateEventModal({
     title: string;
     company: string;
     organizer: string;
+    contactName: string;
+    contactPhone: string;
     branchCode?: string;
     budgetTHB?: number;
     desc?: string;
@@ -195,6 +231,8 @@ export default function CreateEventModal({
     eventName: "",
     companyName: "",
     organizerName: "",
+    contactName: "",
+    contactPhone: "",
     branchCode: "",
     budgetTHB: "",
     description: "",
@@ -205,12 +243,34 @@ export default function CreateEventModal({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [companyList, setCompanyList] = useState<string[]>(companyOptions);
+
+  useEffect(() => {
+    setCompanyList(companyOptions);
+  }, [companyOptions]);
+
+  const handleAddCompany = (newCompany: string) => {
+    const cleaned = newCompany.trim();
+    if (!cleaned) return;
+
+    setForm((s) => ({ ...s, companyName: cleaned }));
+
+    setCompanyList((prev) => {
+      const exists = prev.some(
+        (item) => item.trim().toLowerCase() === cleaned.toLowerCase()
+      );
+      if (exists) return prev;
+      return [...prev, cleaned];
+    });
+  };
 
   const reset = () => {
     setForm({
       eventName: "",
       companyName: "",
       organizerName: "",
+      contactName: "",
+      contactPhone: "",
       branchCode: "",
       budgetTHB: "",
       description: "",
@@ -231,7 +291,9 @@ export default function CreateEventModal({
     const e: Record<string, string> = {};
     if (!form.eventName.trim()) e.eventName = "กรุณากรอกชื่อ Event";
     if (!form.companyName.trim()) e.companyName = "กรุณากรอกชื่อบริษัท";
-    if (!form.organizerName.trim()) e.organizerName = "กรุณากรอกชื่อผู้จัด";
+    if (!form.organizerName.trim()) e.organizerName = "กรุณากรอกชื่อลูกค้า";
+    if (!form.contactName.trim()) e.contactName = "กรุณากรอกชื่อผู้ติดต่อ";
+    if (!form.contactPhone.trim()) e.contactPhone = "กรุณากรอกเบอร์โทร";
     if (!form.budgetTHB.trim()) e.budgetTHB = "กรุณากรอกงบประมาณ";
     if (form.budgetTHB.trim() && Number.isNaN(Number(form.budgetTHB))) {
       e.budgetTHB = "งบประมาณต้องเป็นตัวเลข";
@@ -257,6 +319,8 @@ export default function CreateEventModal({
       title: form.eventName.trim(),
       company: form.companyName.trim(),
       organizer: form.organizerName.trim(),
+      contactName: form.contactName.trim(),
+      contactPhone: form.contactPhone.trim(),
       branchCode: form.branchCode.trim() || undefined,
       budgetTHB: form.budgetTHB.trim() ? Number(form.budgetTHB) : undefined,
       desc: form.description.trim() || undefined,
@@ -306,20 +370,40 @@ export default function CreateEventModal({
                 required
                 value={form.companyName}
                 onChange={(v) => setForm((s) => ({ ...s, companyName: v }))}
+                onAddOption={handleAddCompany}
                 placeholder="Select or type a company"
-                options={companyOptions}
+                options={companyList}
                 error={errors.companyName}
               />
             </div>
 
             <div className="mt-4">
               <Input
-                label="Organizer Name"
+                label="Customer Name"
                 required
                 value={form.organizerName}
                 onChange={(v) => setForm((s) => ({ ...s, organizerName: v }))}
-                placeholder="Organizer's full name"
+                placeholder="Customer full name"
                 error={errors.organizerName}
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                label="Contact Name"
+                required
+                value={form.contactName}
+                onChange={(v) => setForm((s) => ({ ...s, contactName: v }))}
+                placeholder="Contact person name"
+                error={errors.contactName}
+              />
+              <Input
+                label="Contact Phone"
+                required
+                value={form.contactPhone}
+                onChange={(v) => setForm((s) => ({ ...s, contactPhone: v }))}
+                placeholder="Enter contact phone"
+                error={errors.contactPhone}
               />
             </div>
 
