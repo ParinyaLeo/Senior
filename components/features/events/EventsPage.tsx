@@ -20,6 +20,7 @@ import CreateEventModal from "./modals/CreateEventModal";
 import ManageEquipmentModal from "./modals/ManageEquipmentModal";
 import CalendarDayEventsModal from "./modals/CalendarDayEventsModal";
 import EventDetailModal from "./modals/EventDetailModal";
+import ConfirmDeleteEventModal from "./modals/ConfirmDeleteEventModal";
 
 import { statusOptions } from "./constants";
 import {
@@ -70,6 +71,8 @@ export default function EventsPage({
 
   const [manageEventId, setManageEventId] = useState<string | null>(null);
   const [detailEventId, setDetailEventId] = useState<string | null>(null);
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
+
   const [calendarDetail, setCalendarDetail] = useState<{
     dateKey: string;
     events: EventItem[];
@@ -113,7 +116,8 @@ export default function EventsPage({
             const endDate = toDateLocal(endStr);
 
             const safeDate =
-              !Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())
+              !Number.isNaN(startDate.getTime()) &&
+              !Number.isNaN(endDate.getTime())
                 ? `${toYMD(startDate)} - ${toYMD(endDate)}`
                 : r.date;
 
@@ -304,7 +308,7 @@ export default function EventsPage({
     const m = monthCursor.getMonth();
 
     const first = new Date(y, m, 1);
-    const last = new Date(y, m + 1, 0);
+    const last = new Date(y, m + 0 + 1, 0);
 
     const startOffset = first.getDay();
     const totalDays = last.getDate();
@@ -353,19 +357,31 @@ export default function EventsPage({
     return events.find((e) => e.id === manageEventId) ?? null;
   }, [manageEventId, events]);
 
+  const deleteEvent = useMemo(() => {
+    if (!deleteEventId) return null;
+    return events.find((e) => e.id === deleteEventId) ?? null;
+  }, [deleteEventId, events]);
+
   const onManageItems = (eventId: string) => {
     setManageEventId(eventId);
     setIsManageOpen(true);
   };
 
-  const onDeleteEvent = async (eventId: string) => {
-    const target = events.find((ev) => ev.id === eventId);
-    if (!target) return;
+  const onDeleteEvent = (eventId: string) => {
+    setDeleteEventId(eventId);
+  };
 
-    if (!window.confirm(`ลบ Event "${target.title}" ใช่หรือไม่?`)) return;
+  const handleConfirmDeleteEvent = async () => {
+    if (!deleteEventId) return;
+
+    const target = events.find((ev) => ev.id === deleteEventId);
+    if (!target) {
+      setDeleteEventId(null);
+      return;
+    }
 
     try {
-      const res = await fetch(`/api/events/${eventId}`, {
+      const res = await fetch(`/api/events/${deleteEventId}`, {
         method: "DELETE",
       });
 
@@ -375,39 +391,42 @@ export default function EventsPage({
       return;
     }
 
-    if (target.status.tone === "success" && equipmentByEvent[eventId]) {
+    if (target.status.tone === "success" && equipmentByEvent[deleteEventId]) {
       onReturnStock(
-        equipmentByEvent[eventId].map((eq) => ({
+        equipmentByEvent[deleteEventId].map((eq) => ({
           name: eq.name,
           qty: eq.qty,
         }))
       );
     }
 
-    setEvents((prev) => prev.filter((ev) => ev.id !== eventId));
+    setEvents((prev) => prev.filter((ev) => ev.id !== deleteEventId));
 
     setEquipmentByEvent((prev) => {
-      if (!(eventId in prev)) return prev;
+      if (!(deleteEventId in prev)) return prev;
       const next = { ...prev };
-      delete next[eventId];
+      delete next[deleteEventId];
       return next;
     });
 
-    if (manageEventId === eventId) {
+    if (manageEventId === deleteEventId) {
       setIsManageOpen(false);
       setManageEventId(null);
     }
 
     setCalendarDetail((prev) => {
       if (!prev) return prev;
-      const nextEvents = prev.events.filter((ev) => ev.id !== eventId);
+      const nextEvents = prev.events.filter((ev) => ev.id !== deleteEventId);
       if (nextEvents.length === 0) return null;
       return { ...prev, events: nextEvents };
     });
 
-    if (detailEventId === eventId) {
+    if (detailEventId === deleteEventId) {
       setDetailEventId(null);
     }
+
+    setToast(`ลบ Event เรียบร้อย: "${target.title}"`);
+    setDeleteEventId(null);
   };
 
   const handleCreate = async (payload: {
@@ -612,6 +631,13 @@ export default function EventsPage({
         event={detailEvent}
         equipment={detailEquipment}
         onClose={() => setDetailEventId(null)}
+      />
+
+      <ConfirmDeleteEventModal
+        open={!!deleteEventId}
+        eventTitle={deleteEvent?.title ?? ""}
+        onConfirm={handleConfirmDeleteEvent}
+        onCancel={() => setDeleteEventId(null)}
       />
 
       <EventsHeader role={role} onCreate={() => setIsCreateOpen(true)} />

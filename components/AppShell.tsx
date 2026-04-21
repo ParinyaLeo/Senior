@@ -29,7 +29,6 @@ type NotificationItem = {
   audience: Role[];
 };
 
-// ✅ StockRow type และ seed data ย้ายมาไว้ที่นี่ เพื่อ share กับทั้ง Events และ Stock
 export type ItemStatus = "พร้อมใช้" | "ใช้งานอยู่" | "ซ่อมแซม";
 export type Category = "ไฟฟ้า" | "ผ้าใบ" | "ตกแต่ง";
 
@@ -53,88 +52,254 @@ function toCategory(v: string): Category {
 }
 
 function toItemStatus(v: string): ItemStatus {
-  return v === "พร้อมใช้" || v === "ใช้งานอยู่" || v === "ซ่อมแซม" ? v : "พร้อมใช้";
+  return v === "พร้อมใช้" || v === "ใช้งานอยู่" || v === "ซ่อมแซม"
+    ? v
+    : "พร้อมใช้";
 }
 
 const initialStock: StockRow[] = [
   {
-    id: "EQ001", code: "LT-1234", name: "ชุดไฟ LED หลากสี 200W",
-    brand: "PRO LIGHT", category: "ไฟฟ้า", system: "ระบบแสง", zone: "โซน A",
-    status: "พร้อมใช้", qty: 50, available: 50, pricePerDay: 800, cost: 15000,
+    id: "EQ001",
+    code: "LT-1234",
+    name: "ชุดไฟ LED หลากสี 200W",
+    brand: "PRO LIGHT",
+    category: "ไฟฟ้า",
+    system: "ระบบแสง",
+    zone: "โซน A",
+    status: "พร้อมใช้",
+    qty: 50,
+    available: 50,
+    pricePerDay: 800,
+    cost: 15000,
   },
   {
-    id: "EQ002", code: "LT-5678", name: "ชุดไฟ Moving Head 300W",
-    brand: "STAGE PRO", category: "ไฟฟ้า", system: "ระบบแสง", zone: "โซน A",
-    status: "พร้อมใช้", qty: 30, available: 28, pricePerDay: 1500, cost: 45000,
+    id: "EQ002",
+    code: "LT-5678",
+    name: "ชุดไฟ Moving Head 300W",
+    brand: "STAGE PRO",
+    category: "ไฟฟ้า",
+    system: "ระบบแสง",
+    zone: "โซน A",
+    status: "พร้อมใช้",
+    qty: 30,
+    available: 28,
+    pricePerDay: 1500,
+    cost: 45000,
   },
   {
-    id: "EQ003", code: "LT-9012", name: "ชุดไฟ Par Light LED RGB",
-    brand: "LIGHT MASTER", category: "ไฟฟ้า", system: "ระบบแสง", zone: "โซน A",
-    status: "พร้อมใช้", qty: 40, available: 35, pricePerDay: 600, cost: 12000,
+    id: "EQ003",
+    code: "LT-9012",
+    name: "ชุดไฟ Par Light LED RGB",
+    brand: "LIGHT MASTER",
+    category: "ไฟฟ้า",
+    system: "ระบบแสง",
+    zone: "โซน A",
+    status: "พร้อมใช้",
+    qty: 40,
+    available: 35,
+    pricePerDay: 600,
+    cost: 12000,
   },
   {
-    id: "EQ004", code: "ST-0001", name: "เวทีขนาดเล็ก 2x2 เมตร",
-    brand: "STAGE TECH", category: "ผ้าใบ", system: "เวที", zone: "โซน B",
-    status: "พร้อมใช้", qty: 20, available: 20, pricePerDay: 1200, cost: 25000,
+    id: "EQ004",
+    code: "ST-0001",
+    name: "เวทีขนาดเล็ก 2x2 เมตร",
+    brand: "STAGE TECH",
+    category: "ผ้าใบ",
+    system: "เวที",
+    zone: "โซน B",
+    status: "พร้อมใช้",
+    qty: 20,
+    available: 20,
+    pricePerDay: 1200,
+    cost: 25000,
   },
   {
-    id: "EQ005", code: "ST-0002", name: "เวทีกลาง 4x4 เมตร",
-    brand: "STAGE TECH", category: "ผ้าใบ", system: "เวที", zone: "โซน B",
-    status: "พร้อมใช้", qty: 15, available: 12, pricePerDay: 2500, cost: 55000,
+    id: "EQ005",
+    code: "ST-0002",
+    name: "เวทีกลาง 4x4 เมตร",
+    brand: "STAGE TECH",
+    category: "ผ้าใบ",
+    system: "เวที",
+    zone: "โซน B",
+    status: "พร้อมใช้",
+    qty: 15,
+    available: 12,
+    pricePerDay: 2500,
+    cost: 55000,
   },
   {
-    id: "EQ006", code: "ST-0003", name: "เวทีขนาดใหญ่ 6x8 เมตร",
-    brand: "STAGE TECH", category: "ผ้าใบ", system: "เวที", zone: "โซน B",
-    status: "พร้อมใช้", qty: 10, available: 8, pricePerDay: 5000, cost: 120000,
+    id: "EQ006",
+    code: "ST-0003",
+    name: "เวทีขนาดใหญ่ 6x8 เมตร",
+    brand: "STAGE TECH",
+    category: "ผ้าใบ",
+    system: "เวที",
+    zone: "โซน B",
+    status: "พร้อมใช้",
+    qty: 10,
+    available: 8,
+    pricePerDay: 5000,
+    cost: 120000,
   },
   {
-    id: "EQ007", code: "GR-7890", name: "หญ้าเทียม (ม้วน 2x10 เมตร)",
-    brand: "GREEN GRASS", category: "ตกแต่ง", system: "ตกแต่ง", zone: "โซน C",
-    status: "พร้อมใช้", qty: 100, available: 85, pricePerDay: 300, cost: 3500,
+    id: "EQ007",
+    code: "GR-7890",
+    name: "หญ้าเทียม (ม้วน 2x10 เมตร)",
+    brand: "GREEN GRASS",
+    category: "ตกแต่ง",
+    system: "ตกแต่ง",
+    zone: "โซน C",
+    status: "พร้อมใช้",
+    qty: 100,
+    available: 85,
+    pricePerDay: 300,
+    cost: 3500,
   },
   {
-    id: "EQ008", code: "ST-0004", name: "โต๊ะพับหน้าไม้ 180cm",
-    brand: "FURNI PRO", category: "ตกแต่ง", system: "เฟอร์นิเจอร์", zone: "โซน C",
-    status: "พร้อมใช้", qty: 180, available: 180, pricePerDay: 80, cost: 1200,
+    id: "EQ008",
+    code: "ST-0004",
+    name: "โต๊ะพับหน้าไม้ 180cm",
+    brand: "FURNI PRO",
+    category: "ตกแต่ง",
+    system: "เฟอร์นิเจอร์",
+    zone: "โซน C",
+    status: "พร้อมใช้",
+    qty: 180,
+    available: 180,
+    pricePerDay: 80,
+    cost: 1200,
   },
   {
-    id: "EQ009", code: "ST-0005", name: "เก้าอี้พลาสติก มีพนักพิง",
-    brand: "FURNI PRO", category: "ตกแต่ง", system: "เฟอร์นิเจอร์", zone: "โซน C",
-    status: "พร้อมใช้", qty: 420, available: 420, pricePerDay: 20, cost: 350,
+    id: "EQ009",
+    code: "ST-0005",
+    name: "เก้าอี้พลาสติก มีพนักพิง",
+    brand: "FURNI PRO",
+    category: "ตกแต่ง",
+    system: "เฟอร์นิเจอร์",
+    zone: "โซน C",
+    status: "พร้อมใช้",
+    qty: 420,
+    available: 420,
+    pricePerDay: 20,
+    cost: 350,
   },
   {
-    id: "EQ010", code: "AU-0001", name: "เครื่องเสียง PA System 2000W",
-    brand: "SOUND MASTER", category: "ไฟฟ้า", system: "ระบบเสียง", zone: "โซน A",
-    status: "พร้อมใช้", qty: 18, available: 18, pricePerDay: 2000, cost: 85000,
+    id: "EQ010",
+    code: "AU-0001",
+    name: "เครื่องเสียง PA System 2000W",
+    brand: "SOUND MASTER",
+    category: "ไฟฟ้า",
+    system: "ระบบเสียง",
+    zone: "โซน A",
+    status: "พร้อมใช้",
+    qty: 18,
+    available: 18,
+    pricePerDay: 2000,
+    cost: 85000,
   },
   {
-    id: "EQ011", code: "AU-0002", name: "ไมโครโฟนไร้สายคู่",
-    brand: "SOUND MASTER", category: "ไฟฟ้า", system: "ระบบเสียง", zone: "โซน A",
-    status: "พร้อมใช้", qty: 35, available: 35, pricePerDay: 600, cost: 8500,
+    id: "EQ011",
+    code: "AU-0002",
+    name: "ไมโครโฟนไร้สายคู่",
+    brand: "SOUND MASTER",
+    category: "ไฟฟ้า",
+    system: "ระบบเสียง",
+    zone: "โซน A",
+    status: "พร้อมใช้",
+    qty: 35,
+    available: 35,
+    pricePerDay: 600,
+    cost: 8500,
   },
   {
-    id: "EQ012", code: "AV-0001", name: "โปรเจคเตอร์ 5000 Lumens",
-    brand: "VIEW PRO", category: "ไฟฟ้า", system: "ภาพ/โปรเจคเตอร์", zone: "โซน A",
-    status: "พร้อมใช้", qty: 22, available: 22, pricePerDay: 1200, cost: 35000,
+    id: "EQ012",
+    code: "AV-0001",
+    name: "โปรเจคเตอร์ 5000 Lumens",
+    brand: "VIEW PRO",
+    category: "ไฟฟ้า",
+    system: "ภาพ/โปรเจคเตอร์",
+    zone: "โซน A",
+    status: "พร้อมใช้",
+    qty: 22,
+    available: 22,
+    pricePerDay: 1200,
+    cost: 35000,
   },
 ];
 
-const tabsByRole: Record<Role, { key: Tab; label: string; icon: React.ReactNode }[]> = {
-  SA: [{ key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> }],
+const tabsByRole: Record<
+  Role,
+  { key: Tab; label: string; icon: React.ReactNode }[]
+> = {
+  SA: [
+    {
+      key: "events",
+      label: "Events",
+      icon: <CalendarDays className="h-4 w-4" />,
+    },
+  ],
   Manager: [
-    { key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> },
-    { key: "stock", label: "Stock", icon: <Boxes className="h-4 w-4" /> },
-    { key: "issueReturn", label: "Issue/Return", icon: <ArrowLeftRight className="h-4 w-4" /> },
-    { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
-    { key: "settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
+    {
+      key: "events",
+      label: "Events",
+      icon: <CalendarDays className="h-4 w-4" />,
+    },
+    {
+      key: "stock",
+      label: "Stock",
+      icon: <Boxes className="h-4 w-4" />,
+    },
+    {
+      key: "issueReturn",
+      label: "Issue/Return",
+      icon: <ArrowLeftRight className="h-4 w-4" />,
+    },
+    {
+      key: "reports",
+      label: "Reports",
+      icon: <BarChart3 className="h-4 w-4" />,
+    },
+    {
+      key: "settings",
+      label: "Settings",
+      icon: <Settings className="h-4 w-4" />,
+    },
   ],
   Stockkeeper: [
-    { key: "events", label: "Events", icon: <CalendarDays className="h-4 w-4" /> },
-    { key: "stock", label: "Stock", icon: <Boxes className="h-4 w-4" /> },
-    { key: "issueReturn", label: "Issue/Return", icon: <ArrowLeftRight className="h-4 w-4" /> },
-    { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
+    {
+      key: "events",
+      label: "Events",
+      icon: <CalendarDays className="h-4 w-4" />,
+    },
+    {
+      key: "stock",
+      label: "Stock",
+      icon: <Boxes className="h-4 w-4" />,
+    },
+    {
+      key: "issueReturn",
+      label: "Issue/Return",
+      icon: <ArrowLeftRight className="h-4 w-4" />,
+    },
+    {
+      key: "reports",
+      label: "Reports",
+      icon: <BarChart3 className="h-4 w-4" />,
+    },
   ],
 };
+
+function getRoleLabel(role: Role) {
+  if (role === "SA") return "Customer";
+  return role;
+}
+
+function getRoleShort(role: Role) {
+  if (role === "SA") return "C";
+  if (role === "Manager") return "M";
+  return "K";
+}
 
 function LogoMark() {
   return (
@@ -143,7 +308,9 @@ function LogoMark() {
         <span className="text-lg font-black">⬢</span>
       </div>
       <div className="leading-tight">
-        <div className="text-base font-semibold text-zinc-900">Event Stock Manager</div>
+        <div className="text-base font-semibold text-zinc-900">
+          Event Stock Manager
+        </div>
         <div className="text-xs text-zinc-500">ระบบบริหารจัดการ Stock</div>
       </div>
     </div>
@@ -157,10 +324,13 @@ function RoleBadge({ role }: { role: Role }) {
       : role === "Manager"
       ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
       : "bg-violet-50 text-violet-700 ring-violet-100";
+
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${tone}`}>
+    <span
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${tone}`}
+    >
       <span className="h-2 w-2 rounded-full bg-current opacity-70" />
-      {role}
+      {getRoleLabel(role)}
     </span>
   );
 }
@@ -174,7 +344,6 @@ export default function AppShell() {
   const [unread, setUnread] = useState(0);
   const notifRef = React.useRef<HTMLDivElement | null>(null);
 
-  // ✅ shared stock state — Events และ Stock ใช้ข้อมูลชุดเดียวกัน
   const [stockData, setStockData] = useState<StockRow[]>(initialStock);
 
   useEffect(() => {
@@ -230,7 +399,9 @@ export default function AppShell() {
     loadStock();
   }, []);
 
-  const applyStockChange = (updater: StockRow[] | ((prev: StockRow[]) => StockRow[])) => {
+  const applyStockChange = (
+    updater: StockRow[] | ((prev: StockRow[]) => StockRow[])
+  ) => {
     setStockData((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
       fetch("/api/stock", {
@@ -242,7 +413,6 @@ export default function AppShell() {
     });
   };
 
-  // ✅ function หักสต็อกเมื่ออนุมัติ Event
   const deductStock = (equipmentList: { name: string; qty: number }[]) => {
     applyStockChange((prev) =>
       prev.map((row) => {
@@ -258,7 +428,6 @@ export default function AppShell() {
     );
   };
 
-  // ✅ function คืนสต็อกเมื่อ Event ไม่อนุมัติ หรือคืนของ
   const returnStock = (equipmentList: { name: string; qty: number }[]) => {
     applyStockChange((prev) =>
       prev.map((row) => {
@@ -274,7 +443,6 @@ export default function AppShell() {
     );
   };
 
-  // ✅ function แจ้งอุปกรณ์เสียหาย: ติดสถานะซ่อมแซม โดยยังไม่เพิ่มจำนวนพร้อมใช้
   const markDamagedStock = (equipmentList: { name: string; qty: number }[]) => {
     applyStockChange((prev) =>
       prev.map((row) => {
@@ -290,7 +458,7 @@ export default function AppShell() {
 
   const isSA = role === "SA";
 
-  React.useEffect(() => {
+  useEffect(() => {
     const allowed = tabsByRole[role].map((t) => t.key);
     if (!allowed.includes(tab)) setTab(allowed[0]);
   }, [role, tab]);
@@ -359,7 +527,10 @@ export default function AppShell() {
           body: JSON.stringify({ role }),
         });
         setNotifList((prev) =>
-          prev.map((n) => ({ ...n, unreadFor: n.unreadFor.filter((r) => r !== role) }))
+          prev.map((n) => ({
+            ...n,
+            unreadFor: n.unreadFor.filter((r) => r !== role),
+          }))
         );
         setUnread(0);
       }
@@ -368,7 +539,11 @@ export default function AppShell() {
     }
   };
 
-  const renderTabButton = (t: { key: Tab; label: string; icon: React.ReactNode }) => {
+  const renderTabButton = (t: {
+    key: Tab;
+    label: string;
+    icon: React.ReactNode;
+  }) => {
     const active = tab === t.key;
     return (
       <button
@@ -389,7 +564,6 @@ export default function AppShell() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Topbar */}
       <div className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-4">
           <div className="shrink-0">
@@ -419,7 +593,7 @@ export default function AppShell() {
                 onChange={(e) => setRole(e.target.value as Role)}
                 className="h-10 rounded-2xl border border-zinc-200 bg-white px-4 pr-10 text-sm font-semibold text-zinc-800 shadow-sm outline-none hover:bg-zinc-50"
               >
-                <option value="SA">SA</option>
+                <option value="SA">Customer</option>
                 <option value="Manager">Manager</option>
                 <option value="Stockkeeper">Stockkeeper</option>
               </select>
@@ -452,13 +626,20 @@ export default function AppShell() {
                       <div className="p-4 text-sm text-zinc-500">ยังไม่มีการแจ้งเตือน</div>
                     ) : (
                       notifList.map((n) => (
-                        <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-50">
+                        <div
+                          key={n.id}
+                          className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-50"
+                        >
                           <div className="mt-0.5">
                             <Bell className="h-4 w-4 text-amber-500" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-zinc-900">{n.title}</div>
-                            <div className="mt-0.5 text-xs text-zinc-600">{n.message}</div>
+                            <div className="text-sm font-semibold text-zinc-900">
+                              {n.title}
+                            </div>
+                            <div className="mt-0.5 text-xs text-zinc-600">
+                              {n.message}
+                            </div>
                             <div className="mt-1 text-[11px] text-zinc-400">
                               {new Date(n.createdAt).toLocaleString("th-TH")}
                             </div>
@@ -476,18 +657,19 @@ export default function AppShell() {
 
             <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 shadow-sm">
               <div className="grid h-8 w-8 place-items-center rounded-full bg-zinc-100 text-sm font-bold text-zinc-700">
-                {role === "SA" ? "S" : role === "Manager" ? "M" : "K"}
+                {getRoleShort(role)}
               </div>
               <div className="hidden leading-tight md:block">
-                <div className="text-sm font-semibold text-zinc-900">{role} Team</div>
-                <div className="text-xs text-zinc-500">{role}</div>
+                <div className="text-sm font-semibold text-zinc-900">
+                  {getRoleLabel(role)} Team
+                </div>
+                <div className="text-xs text-zinc-500">{getRoleLabel(role)}</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
       <div className="mx-auto max-w-7xl px-2">
         {tab === "events" && (
           <EventsPage
