@@ -37,7 +37,6 @@ export default function EventsPage({
   stockData,
   onDeductStock,
   onReturnStock,
-  // ✅ รับ issuedEventIds จาก AppShell
   issuedEventIds = new Set<string>(),
 }: {
   role: Role;
@@ -158,6 +157,12 @@ export default function EventsPage({
     window.addEventListener("app:event:returned", onReload);
     return () => window.removeEventListener("app:event:returned", onReload);
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const companyOptions = useMemo(
     () => Array.from(new Set(events.map((e) => e.company))).sort((a, b) => a.localeCompare(b)),
@@ -383,8 +388,10 @@ export default function EventsPage({
 
       <CreateEventModal open={isCreateOpen} onClose={() => setIsCreateOpen(false)} onCreate={handleCreate} companyOptions={companyOptions} />
 
+      {/* ✅ เพิ่ม eventId prop */}
       <ManageEquipmentModal
         open={isManageOpen}
+        eventId={manageEventId ?? ""}
         eventTitle={activeEvent?.title ?? ""}
         startDateInitial={activeEvent ? parseDateRange(activeEvent.date).startStr : ""}
         endDateInitial={activeEvent ? parseDateRange(activeEvent.date).endStr : ""}
@@ -418,7 +425,6 @@ export default function EventsPage({
           if (decision === "approved") {
             onDeductStock(equipment.map((eq) => ({ name: eq.name, qty: eq.qty })));
             pushNotification({ title: "อนุมัติอุปกรณ์ Event", message: `${targetEvent?.title ?? "Event"} อนุมัติรายการอุปกรณ์แล้ว`, audience: ["SA", "Stockkeeper"] });
-            // ✅ แจ้ง IssueReturnPage ให้ reload ข้อมูลใหม่
             window.dispatchEvent(new CustomEvent("app:event:approved"));
             setToast(`บันทึกแล้ว: "${targetEvent?.title ?? "Event"}" ถูกอนุมัติ`);
           } else {
@@ -465,7 +471,6 @@ export default function EventsPage({
       <EventsViewToggle view={view} onChangeView={setView} />
 
       {view === "list" && (
-        // ✅ ส่ง visibleEventsWithIssued แทน visibleEvents
         <EventsList
           events={visibleEventsWithIssued}
           role={role}

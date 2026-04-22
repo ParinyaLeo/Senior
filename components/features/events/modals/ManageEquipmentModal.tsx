@@ -6,17 +6,17 @@ import type { StockRow } from "../../../AppShell";
 import type { SelectedEquipment } from "../types";
 import { formatTHB, toDateLocal } from "../helpers";
 
-// ─── Type ประวัติการแก้ไข ─────────────────────────────────────────────────
 type HistoryEntry = {
   id: string;
   action: "เพิ่ม" | "ลบ";
   equipmentName: string;
   qty: number;
-  timestamp: Date;
+  timestamp: string;
 };
 
 export default function ManageEquipmentModal({
   open,
+  eventId,
   eventTitle,
   startDateInitial,
   endDateInitial,
@@ -26,6 +26,7 @@ export default function ManageEquipmentModal({
   onSubmitDecision,
 }: {
   open: boolean;
+  eventId: string;
   eventTitle: string;
   startDateInitial: string;
   endDateInitial: string;
@@ -50,8 +51,8 @@ export default function ManageEquipmentModal({
   const [isEquipOpen, setIsEquipOpen] = useState(false);
   const [isDecisionOpen, setIsDecisionOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  // ✅ เก็บประวัติการแก้ไข
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const equipRef = useRef<HTMLDivElement | null>(null);
 
   const equipmentOptions = useMemo(() => {
@@ -70,15 +71,38 @@ export default function ManageEquipmentModal({
     [equipmentOptions, selectedName]
   );
 
+  // ✅ โหลดประวัติจาก database เมื่อเปิด modal
   useEffect(() => {
-    if (!open) return;
+    if (!open || !eventId) return;
     setStartDate(startDateInitial);
     setEndDate(endDateInitial);
     setEquipment(initialEquipment);
-    // ✅ reset history เมื่อเปิด modal ใหม่
-    setHistory([]);
     setShowHistory(false);
-  }, [open, startDateInitial, endDateInitial, initialEquipment]);
+
+    const loadHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const res = await fetch(`/api/events/${eventId}/history`);
+        if (!res.ok) return;
+        const rows = (await res.json()) as Array<{
+          id: string;
+          action: "เพิ่ม" | "ลบ";
+          equipment_name: string;
+          qty: number;
+          changed_at: string;
+        }>;
+        setHistory(rows.map((r) => ({
+          id: r.id,
+          action: r.action,
+          equipmentName: r.equipment_name,
+          qty: r.qty,
+          timestamp: r.changed_at,
+        })));
+      } catch { /* silent */ }
+      finally { setIsLoadingHistory(false); }
+    };
+    loadHistory();
+  }, [open, eventId, startDateInitial, endDateInitial, initialEquipment]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -133,59 +157,53 @@ export default function ManageEquipmentModal({
     return Object.keys(e).length === 0;
   };
 
+  // ✅ บันทึกประวัติลง database
+  const saveHistory = async (action: "เพิ่ม" | "ลบ", equipmentName: string, qty: number) => {
+    try {
+      const res = await fetch(`/api/events/${eventId}/history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, equipmentName, qty }),
+      });
+      if (!res.ok) return;
+      const newEntry: HistoryEntry = {
+        id: `${Date.now()}-${Math.random()}`,
+        action,
+        equipmentName,
+        qty,
+        timestamp: new Date().toISOString(),
+      };
+      setHistory((prev) => [newEntry, ...prev]);
+    } catch { /* silent */ }
+  };
+
   const addSelected = () => {
     if (!validateSelect() || !selectedOption) return;
     const q = Number(qty);
-
     setEquipment((prev) => {
       const idx = prev.findIndex((x) => x.name === selectedOption.name);
       if (idx === -1) {
-        return [
-          ...prev,
-          {
-            name: selectedOption.name,
-            qty: q,
-            available: selectedOption.available,
-            category: selectedOption.category,
-            pricePerDayTHB: selectedOption.pricePerDayTHB,
-          },
-        ];
+        return [...prev, {
+          name: selectedOption.name, qty: q,
+          available: selectedOption.available,
+          category: selectedOption.category,
+          pricePerDayTHB: selectedOption.pricePerDayTHB,
+        }];
       }
       const next = [...prev];
       next[idx] = { ...next[idx], qty: next[idx].qty + q };
       return next;
     });
-
-    // ✅ บันทึกประวัติ เพิ่มอุปกรณ์
-    setHistory((prev) => [
-      {
-        id: `${Date.now()}-${Math.random()}`,
-        action: "เพิ่ม",
-        equipmentName: selectedOption.name,
-        qty: q,
-        timestamp: new Date(),
-      },
-      ...prev,
-    ]);
-
+    // ✅ บันทึกลง database
+    saveHistory("เพิ่ม", selectedOption.name, q);
     setIsSelectOpen(false);
   };
 
   const removeEquipmentAt = (idx: number) => {
     const removed = equipment[idx];
     setEquipment((prev) => prev.filter((_, i) => i !== idx));
-
-    // ✅ บันทึกประวัติ ลบอุปกรณ์
-    setHistory((prev) => [
-      {
-        id: `${Date.now()}-${Math.random()}`,
-        action: "ลบ",
-        equipmentName: removed.name,
-        qty: removed.qty,
-        timestamp: new Date(),
-      },
-      ...prev,
-    ]);
+    // ✅ บันทึกลง database
+    saveHistory("ลบ", removed.name, removed.qty);
   };
 
   const totalQty = useMemo(() => equipment.reduce((sum, it) => sum + it.qty, 0), [equipment]);
@@ -324,40 +342,46 @@ export default function ManageEquipmentModal({
                 </div>
               )}
 
-              {/* ✅ ประวัติการแก้ไขอุปกรณ์ */}
-              {history.length > 0 && (
-                <div className="mt-5">
-                  <button
-                    onClick={() => setShowHistory((v) => !v)}
-                    className="flex items-center gap-2 text-sm font-semibold text-zinc-700 hover:text-zinc-900"
-                  >
-                    <Clock className="h-4 w-4 text-zinc-400" />
-                    ประวัติการแก้ไข ({history.length})
-                    <span className="text-xs text-zinc-400">{showHistory ? "▲ ซ่อน" : "▼ ดู"}</span>
-                  </button>
+              {/* ✅ ประวัติการแก้ไขจาก database */}
+              <div className="mt-5">
+                <button
+                  onClick={() => setShowHistory((v) => !v)}
+                  className="flex items-center gap-2 text-sm font-semibold text-zinc-700 hover:text-zinc-900"
+                >
+                  <Clock className="h-4 w-4 text-zinc-400" />
+                  ประวัติการแก้ไข {history.length > 0 ? `(${history.length})` : ""}
+                  <span className="text-xs text-zinc-400">{showHistory ? "▲ ซ่อน" : "▼ ดู"}</span>
+                </button>
 
-                  {showHistory && (
-                    <div className="mt-3 space-y-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-                      {history.map((h) => (
-                        <div key={h.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-2.5">
-                          <div className="flex items-center gap-3">
-                            <span className={["rounded-full px-2.5 py-1 text-xs font-semibold ring-1", h.action === "เพิ่ม" ? "bg-emerald-100 text-emerald-700 ring-emerald-200" : "bg-red-100 text-red-700 ring-red-200"].join(" ")}>
-                              {h.action}
-                            </span>
-                            <div>
-                              <div className="text-sm font-medium text-zinc-900">{h.equipmentName}</div>
-                              <div className="text-xs text-zinc-500">จำนวน {h.qty} ชิ้น</div>
+                {showHistory && (
+                  <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+                    {isLoadingHistory ? (
+                      <div className="py-4 text-center text-sm text-zinc-400">กำลังโหลด...</div>
+                    ) : history.length === 0 ? (
+                      <div className="py-4 text-center text-sm text-zinc-400">ยังไม่มีประวัติการแก้ไข</div>
+                    ) : (
+                      <div className="max-h-[200px] space-y-2 overflow-y-auto">
+                        {history.map((h) => (
+                          <div key={h.id} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-2.5">
+                            <div className="flex items-center gap-3">
+                              <span className={["rounded-full px-2.5 py-1 text-xs font-semibold ring-1", h.action === "เพิ่ม" ? "bg-emerald-100 text-emerald-700 ring-emerald-200" : "bg-red-100 text-red-700 ring-red-200"].join(" ")}>
+                                {h.action}
+                              </span>
+                              <div>
+                                <div className="text-sm font-medium text-zinc-900">{h.equipmentName}</div>
+                                <div className="text-xs text-zinc-500">จำนวน {h.qty} ชิ้น</div>
+                              </div>
+                            </div>
+                            <div className="text-xs text-zinc-400">
+                              {new Date(h.timestamp).toLocaleString("th-TH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                             </div>
                           </div>
-                          <div className="text-xs text-zinc-400">
-                            {h.timestamp.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="mt-6 flex items-center justify-end gap-3">
                 <button onClick={onClose} className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">ยกเลิก</button>
@@ -378,9 +402,7 @@ export default function ManageEquipmentModal({
                   <div className="text-lg font-semibold text-zinc-900">Select Equipment</div>
                   <div className="mt-1 text-sm text-zinc-500">Choose equipment and specify quantity</div>
                 </div>
-                <button onClick={() => setIsSelectOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" title="Close">
-                  <X className="h-4 w-4" />
-                </button>
+                <button onClick={() => setIsSelectOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"><X className="h-4 w-4" /></button>
               </div>
               <div className="px-5 pb-5">
                 <div ref={equipRef} className="relative">

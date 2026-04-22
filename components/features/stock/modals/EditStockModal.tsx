@@ -36,7 +36,6 @@ export default function EditStockModal({
 
   React.useEffect(() => {
     if (!open || !item) return;
-
     setForm({
       status: item.status,
       name: item.name,
@@ -49,17 +48,14 @@ export default function EditStockModal({
       pricePerDay: String(item.pricePerDay),
       cost: String(item.cost),
     });
-
     setErrors({});
   }, [open, item]);
 
   React.useEffect(() => {
     if (!open) return;
-
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -72,20 +68,9 @@ export default function EditStockModal({
     if (!form.zone.trim()) e.zone = "กรุณาเลือกโซน";
 
     if (!form.qty.trim()) {
-      e.qty = "กรุณาระบุจำนวน";
-    } else if (Number.isNaN(Number(form.qty)) || Number(form.qty) <= 0) {
-      e.qty = "จำนวนต้องเป็นตัวเลขมากกว่า 0";
-    }
-
-    if (!form.available.trim()) {
-      e.available = "กรุณาระบุจำนวนพร้อมใช้";
-    } else if (
-      Number.isNaN(Number(form.available)) ||
-      Number(form.available) < 0
-    ) {
-      e.available = "จำนวนพร้อมใช้ต้องเป็นตัวเลข";
-    } else if (Number(form.available) > Number(form.qty)) {
-      e.available = "จำนวนพร้อมใช้ต้องไม่เกินจำนวนรวม";
+      e.qty = "กรุณาระบุจำนวนรวม";
+    } else if (Number.isNaN(Number(form.qty)) || Number(form.qty) < 0) {
+      e.qty = "จำนวนรวมต้องเป็นตัวเลข";
     }
 
     if (!form.pricePerDay.trim()) {
@@ -141,10 +126,12 @@ export default function EditStockModal({
         : "border-zinc-200 focus:ring-2 focus:ring-zinc-200",
     ].join(" ");
 
+  const disabledCls =
+    "h-10 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3 text-sm text-zinc-500 outline-none cursor-not-allowed";
+
   return (
     <div className="fixed inset-0 z-[120]">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-2xl">
           <div className="flex items-start justify-between gap-3 p-5">
@@ -154,7 +141,6 @@ export default function EditStockModal({
               </div>
               <div className="mt-1 text-sm text-zinc-500">{item.name}</div>
             </div>
-
             <button
               onClick={onClose}
               className="grid h-9 w-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
@@ -166,11 +152,7 @@ export default function EditStockModal({
           <div className="px-5 pb-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <StockField label="รหัส" required>
-                <input
-                  disabled
-                  value={item.id}
-                  className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3 text-sm text-zinc-500 outline-none"
-                />
+                <input disabled value={item.id} className={disabledCls} />
               </StockField>
 
               <StockField label="สถานะ" required>
@@ -249,27 +231,13 @@ export default function EditStockModal({
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, qty: e.target.value }))
                   }
-                  placeholder="ระบุจำนวน"
+                  placeholder="ระบุจำนวนรวม"
                   className={inp(errors.qty)}
                 />
               </StockField>
 
-              <StockField
-                label="จำนวนพร้อมใช้"
-                required
-                error={errors.available}
-              >
-                <input
-                  value={form.available}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      available: e.target.value,
-                    }))
-                  }
-                  placeholder="ระบุจำนวนพร้อมใช้"
-                  className={inp(errors.available)}
-                />
+              <StockField label="จำนวนพร้อมใช้" required>
+                <input disabled value={form.available} className={disabledCls} />
               </StockField>
 
               <StockField
@@ -290,11 +258,7 @@ export default function EditStockModal({
                 />
               </StockField>
 
-              <StockField
-                label="ราคาต้นทุน (บาท)"
-                required
-                error={errors.cost}
-              >
+              <StockField label="ราคาต้นทุน (บาท)" required error={errors.cost}>
                 <input
                   value={form.cost}
                   onChange={(e) =>
@@ -306,11 +270,7 @@ export default function EditStockModal({
               </StockField>
 
               <div className="md:col-span-2">
-                <StockField
-                  label="หมวดหมู่"
-                  required
-                  error={errors.typeLabel}
-                >
+                <StockField label="หมวดหมู่" required error={errors.typeLabel}>
                   <SystemDropdown
                     value={form.typeLabel}
                     onChange={(v) =>

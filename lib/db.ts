@@ -71,6 +71,29 @@ export type StockRowDb = {
   cost: number;
 };
 
+export type StockHistoryRow = {
+  id: string;
+  stock_id: string;
+  stock_code: string;
+  stock_name: string;
+  field_name: string;
+  change_type: "increase" | "decrease";
+  old_value: number;
+  new_value: number;
+  delta: number;
+  created_at: string;
+};
+
+// ✅ Type สำหรับประวัติการแก้ไขอุปกรณ์ใน Event
+export type EquipmentHistoryRow = {
+  id: string;
+  event_id: string;
+  action: "เพิ่ม" | "ลบ";
+  equipment_name: string;
+  qty: number;
+  changed_at: string;
+};
+
 async function ensureNotificationsTable(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
@@ -146,10 +169,53 @@ async function ensureStockTable(client?: PoolClient) {
   }
 }
 
+async function ensureStockHistoryTable(client?: PoolClient) {
+  const c = client ?? (await pool.connect());
+  try {
+    await c.query(`
+      CREATE TABLE IF NOT EXISTS stock_history (
+        id TEXT PRIMARY KEY,
+        stock_id TEXT NOT NULL,
+        stock_code TEXT NOT NULL,
+        stock_name TEXT NOT NULL,
+        field_name TEXT NOT NULL,
+        change_type TEXT NOT NULL,
+        old_value INTEGER NOT NULL,
+        new_value INTEGER NOT NULL,
+        delta INTEGER NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+  } finally {
+    if (!client) c.release();
+  }
+}
+
+// ✅ Table สำหรับประวัติการแก้ไขอุปกรณ์ใน Event
+async function ensureEquipmentHistoryTable(client?: PoolClient) {
+  const c = client ?? (await pool.connect());
+  try {
+    await c.query(`
+      CREATE TABLE IF NOT EXISTS equipment_history (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        equipment_name TEXT NOT NULL,
+        qty INTEGER NOT NULL,
+        changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+  } finally {
+    if (!client) c.release();
+  }
+}
+
 async function ensureTables(client?: PoolClient) {
   await ensureNotificationsTable(client);
   await ensureEventsTable(client);
   await ensureStockTable(client);
+  await ensureStockHistoryTable(client);
+  await ensureEquipmentHistoryTable(client);
 }
 
 export async function insertNotification(payload: {
@@ -166,14 +232,7 @@ export async function insertNotification(payload: {
     await client.query(
       `INSERT INTO notifications (id, title, message, audience, unread_for, created_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        payload.id,
-        payload.title,
-        payload.message,
-        payload.audience,
-        payload.unread,
-        payload.createdAt,
-      ]
+      [payload.id, payload.title, payload.message, payload.audience, payload.unread, payload.createdAt]
     );
   } finally {
     client.release();
@@ -247,26 +306,10 @@ export async function listEvents(): Promise<EventRow[]> {
   try {
     await ensureEventsTable(client);
     const res: QueryResult<EventRow> = await client.query(
-      `SELECT
-         id,
-         title,
-         status_text,
-         status_tone,
-         issue_status,
-         created_at,
-         description,
-         company,
-         place,
-         start_date,
-         end_date,
-         items_count,
-         organizer,
-         branch_code,
-         budget_thb,
-         attendees,
-         equipment
-       FROM events
-       ORDER BY created_at DESC, id DESC`
+      `SELECT id, title, status_text, status_tone, issue_status, created_at,
+         description, company, place, start_date, end_date, items_count,
+         organizer, branch_code, budget_thb, attendees, equipment
+       FROM events ORDER BY created_at DESC, id DESC`
     );
     return res.rows;
   } finally {
@@ -279,27 +322,10 @@ export async function getEventById(id: string): Promise<EventRow | null> {
   try {
     await ensureEventsTable(client);
     const res: QueryResult<EventRow> = await client.query(
-      `SELECT
-         id,
-         title,
-         status_text,
-         status_tone,
-         issue_status,
-         created_at,
-         description,
-         company,
-         place,
-         start_date,
-         end_date,
-         items_count,
-         organizer,
-         branch_code,
-         budget_thb,
-         attendees,
-         equipment
-       FROM events
-       WHERE id = $1
-       LIMIT 1`,
+      `SELECT id, title, status_text, status_tone, issue_status, created_at,
+         description, company, place, start_date, end_date, items_count,
+         organizer, branch_code, budget_thb, attendees, equipment
+       FROM events WHERE id = $1 LIMIT 1`,
       [id]
     );
     return res.rows[0] ?? null;
@@ -333,28 +359,14 @@ export async function insertEvent(payload: {
       `INSERT INTO events (
         id, title, status_text, status_tone, created_at, description, company, place,
         start_date, end_date, items_count, organizer, branch_code, budget_thb, attendees, equipment, issue_status
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17
-      )`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17)`,
       [
-        payload.id,
-        payload.title,
-        payload.statusText,
-        payload.statusTone,
-        payload.createdAt,
-        payload.description,
-        payload.company,
-        payload.place,
-        payload.startDate,
-        payload.endDate,
-        payload.itemsCount,
-        payload.organizer ?? null,
-        payload.branchCode ?? null,
-        payload.budgetTHB ?? null,
-        payload.attendees ?? null,
-        JSON.stringify(payload.equipment ?? []),
-        "ready",
+        payload.id, payload.title, payload.statusText, payload.statusTone,
+        payload.createdAt, payload.description, payload.company, payload.place,
+        payload.startDate, payload.endDate, payload.itemsCount,
+        payload.organizer ?? null, payload.branchCode ?? null,
+        payload.budgetTHB ?? null, payload.attendees ?? null,
+        JSON.stringify(payload.equipment ?? []), "ready",
       ]
     );
   } finally {
@@ -367,9 +379,7 @@ export async function updateEventIssueStatus(id: string, issueStatus: EventLifec
   try {
     await ensureEventsTable(client);
     const res = await client.query(
-      `UPDATE events
-       SET issue_status = $2
-       WHERE id = $1`,
+      `UPDATE events SET issue_status = $2 WHERE id = $1`,
       [id, issueStatus]
     );
     return res.rowCount ?? 0;
@@ -392,11 +402,8 @@ export async function deductStockForEventIssue(eventId: string) {
            ELSE s.status
          END
        FROM (
-         SELECT
-           item->>'name' AS name,
-           GREATEST(0, COALESCE((item->>'qty')::int, 0)) AS qty
-         FROM events ev,
-              jsonb_array_elements(ev.equipment) AS item
+         SELECT item->>'name' AS name, GREATEST(0, COALESCE((item->>'qty')::int, 0)) AS qty
+         FROM events ev, jsonb_array_elements(ev.equipment) AS item
          WHERE ev.id = $1
        ) e
        WHERE s.name = e.name`,
@@ -428,16 +435,11 @@ export async function updateEventDecision(payload: {
          status_text = $5,
          status_tone = $6,
          equipment = $7::jsonb,
-issue_status = CASE WHEN $6 = 'pending' THEN 'ready' ELSE issue_status END
-WHERE id = $1`,
+         issue_status = CASE WHEN $6 = 'pending' THEN 'ready' ELSE issue_status END
+       WHERE id = $1`,
       [
-        payload.id,
-        payload.startDate,
-        payload.endDate,
-        payload.itemsCount,
-        payload.statusText,
-        payload.statusTone,
-        JSON.stringify(payload.equipment),
+        payload.id, payload.startDate, payload.endDate, payload.itemsCount,
+        payload.statusText, payload.statusTone, JSON.stringify(payload.equipment),
       ]
     );
     return res.rowCount ?? 0;
@@ -463,8 +465,7 @@ export async function listStockItems(): Promise<StockRowDb[]> {
     await ensureStockTable(client);
     const res: QueryResult<StockRowDb> = await client.query(
       `SELECT id, code, name, brand, category, system, zone, status, qty, available, price_per_day, cost
-       FROM stock_items
-       ORDER BY id ASC`
+       FROM stock_items ORDER BY id ASC`
     );
     return res.rows;
   } finally {
@@ -472,52 +473,117 @@ export async function listStockItems(): Promise<StockRowDb[]> {
   }
 }
 
-export async function replaceStockItems(items: Array<{
-  id: string;
-  code: string;
-  name: string;
-  brand: string;
-  category: string;
-  system: string;
-  zone: string;
-  status: string;
-  qty: number;
-  available: number;
-  pricePerDay: number;
-  cost: number;
-}>) {
+export async function replaceStockItems(
+  items: Array<{
+    id: string;
+    code: string;
+    name: string;
+    brand: string;
+    category: string;
+    system: string;
+    zone: string;
+    status: string;
+    qty: number;
+    available: number;
+    pricePerDay: number;
+    cost: number;
+  }>,
+  historyEntries?: Array<{
+    id: string;
+    stockId: string;
+    stockCode: string;
+    stockName: string;
+    fieldName: string;
+    changeType: "increase" | "decrease";
+    oldValue: number;
+    newValue: number;
+    delta: number;
+    createdAt: string;
+  }>
+) {
   const client = await pool.connect();
   try {
     await ensureStockTable(client);
+    await ensureStockHistoryTable(client);
     await client.query("BEGIN");
     await client.query(`DELETE FROM stock_items`);
     for (const item of items) {
       await client.query(
         `INSERT INTO stock_items (
           id, code, name, brand, category, system, zone, status, qty, available, price_per_day, cost
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-        )`,
-        [
-          item.id,
-          item.code,
-          item.name,
-          item.brand,
-          item.category,
-          item.system,
-          item.zone,
-          item.status,
-          item.qty,
-          item.available,
-          item.pricePerDay,
-          item.cost,
-        ]
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [item.id, item.code, item.name, item.brand, item.category, item.system,
+         item.zone, item.status, item.qty, item.available, item.pricePerDay, item.cost]
       );
+    }
+    if (historyEntries && historyEntries.length > 0) {
+      for (const h of historyEntries) {
+        await client.query(
+          `INSERT INTO stock_history (id, stock_id, stock_code, stock_name, field_name, change_type, old_value, new_value, delta, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [h.id, h.stockId, h.stockCode, h.stockName, h.fieldName, h.changeType, h.oldValue, h.newValue, h.delta, h.createdAt]
+        );
+      }
     }
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listStockHistory(limit = 100): Promise<StockHistoryRow[]> {
+  const client = await pool.connect();
+  try {
+    await ensureStockHistoryTable(client);
+    const res: QueryResult<StockHistoryRow> = await client.query(
+      `SELECT id, stock_id, stock_code, stock_name, field_name, change_type, old_value, new_value, delta, created_at
+       FROM stock_history ORDER BY created_at DESC LIMIT $1`,
+      [limit]
+    );
+    return res.rows;
+  } finally {
+    client.release();
+  }
+}
+
+// ✅ บันทึกประวัติการแก้ไขอุปกรณ์ใน Event
+export async function insertEquipmentHistory(payload: {
+  id: string;
+  eventId: string;
+  action: "เพิ่ม" | "ลบ";
+  equipmentName: string;
+  qty: number;
+  changedAt: string;
+}) {
+  const client = await pool.connect();
+  try {
+    await ensureEquipmentHistoryTable(client);
+    await client.query(
+      `INSERT INTO equipment_history (id, event_id, action, equipment_name, qty, changed_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [payload.id, payload.eventId, payload.action, payload.equipmentName, payload.qty, payload.changedAt]
+    );
+  } finally {
+    client.release();
+  }
+}
+
+// ✅ ดึงประวัติการแก้ไขอุปกรณ์ของ Event
+export async function listEquipmentHistoryByEvent(eventId: string): Promise<EquipmentHistoryRow[]> {
+  const client = await pool.connect();
+  try {
+    await ensureEquipmentHistoryTable(client);
+    const res: QueryResult<EquipmentHistoryRow> = await client.query(
+      `SELECT id, event_id, action, equipment_name, qty, changed_at
+       FROM equipment_history
+       WHERE event_id = $1
+       ORDER BY changed_at DESC`,
+      [eventId]
+    );
+    return res.rows;
   } finally {
     client.release();
   }
