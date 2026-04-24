@@ -610,7 +610,7 @@ export default function AppShell() {
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
-                className="h-10 rounded-2xl border border-zinc-200 bg-white px-4 pr-10 text-sm font-semibold text-zinc-800 shadow-sm outline-none hover:bg-zinc-50"
+                className="h-10 rounded-2xl border border-zinc-200 bg-white px-4 pr-10 text-sm font-semibold text-zinc-800 shadow-sm outline-none hover:bg-zinc-50 appearance-none"
               >
                 <option value="SA">Customer</option>
                 <option value="Manager">Manager</option>
@@ -697,7 +697,6 @@ export default function AppShell() {
             onDeductStock={deductStock}
             onReturnStock={returnStock}
             issuedEventIds={issuedEventIds}
-            onUnmarkIssuedEvent={unmarkEventAsIssued}
           />
         )}
         {tab === "stock" && (
@@ -710,6 +709,7 @@ export default function AppShell() {
         {tab === "issueReturn" && (
           <IssueReturn
            key={tab}
+           role={role}
             stockData={stockData}
             onDeductStock={deductStock}
             onReturnStock={returnStock}
@@ -718,7 +718,7 @@ export default function AppShell() {
             onUnmarkEventAsIssued={unmarkEventAsIssued}
           />
         )}
-        {tab === "reports" && <Reports stockData={stockData} />}
+        {tab === "reports" && <Reports role={role} stockData={stockData} />}
         {tab === "settings" && role === "Manager" && <SettingsPage />}
         {tab === "settings" && role !== "Manager" && (
           <div className="px-6 py-10 text-sm text-zinc-500">Manager Only</div>

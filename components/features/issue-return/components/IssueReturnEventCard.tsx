@@ -3,13 +3,16 @@ import {
   ArrowRight,
   CheckCircle2,
   CornerDownLeft,
+  Clock,
 } from "lucide-react";
 import type { IssueEvent, TabKey } from "../types";
+import type { Role } from "../../../AppShell";
 import IssueReturnStatusPill from "./IssueReturnStatusPill";
 
 type Props = {
   event: IssueEvent;
   tab: TabKey;
+  role: Role;
   onIssueClick: (event: IssueEvent) => void;
   onReturnClick: (event: IssueEvent) => void;
 };
@@ -17,6 +20,7 @@ type Props = {
 export default function IssueReturnEventCard({
   event,
   tab,
+  role,
   onIssueClick,
   onReturnClick,
 }: Props) {
@@ -38,51 +42,66 @@ export default function IssueReturnEventCard({
           </div>
         </div>
 
-        {tab === "issue" && (
+        {/* แท็บเบิกอุปกรณ์ */}
+        {tab === "issue" && role === "Stockkeeper" && (
           <button
             onClick={() => onIssueClick(event)}
             className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
           >
             <ArrowRight className="h-4 w-4" />
-            Issue
+            เบิกอุปกรณ์
           </button>
         )}
-
-        {tab === "inuse" && (
-          <div className="inline-flex shrink-0 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            In Use
+        {tab === "issue" && role !== "Stockkeeper" && (
+          <div className="inline-flex shrink-0 items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700">
+            <Clock className="h-4 w-4" />
+            รอ Stockkeeper ดำเนินการ
           </div>
         )}
 
-        {tab === "return" && (
+        {/* แท็บกำลังใช้งาน */}
+        {tab === "inuse" && (
+          <div className="inline-flex shrink-0 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            กำลังใช้งาน
+          </div>
+        )}
+
+        {/* แท็บคืนอุปกรณ์ */}
+        {tab === "return" && role === "Stockkeeper" && (
           <button
             onClick={() => onReturnClick(event)}
             className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
           >
             <CornerDownLeft className="h-4 w-4" />
-            Return
+            คืนอุปกรณ์
           </button>
+        )}
+        {tab === "return" && role !== "Stockkeeper" && (
+          <div className="inline-flex shrink-0 items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700">
+            <CornerDownLeft className="h-4 w-4" />
+            รอ Stockkeeper คืนอุปกรณ์
+          </div>
         )}
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div>
-          <div className="text-xs text-zinc-400">Event Date</div>
+          <div className="text-xs text-zinc-400">วันที่จัดงาน</div>
           <div className="mt-1 text-sm font-medium text-zinc-900">
             {event.eventDate}
           </div>
         </div>
 
         <div>
-          <div className="text-xs text-zinc-400">Issue Date</div>
+          <div className="text-xs text-zinc-400">วันที่เบิก</div>
           <div className="mt-1 text-sm font-medium text-zinc-900">
             {event.issueDate}
           </div>
         </div>
 
         <div>
-          <div className="text-xs text-zinc-400">Equipment</div>
+          <div className="text-xs text-zinc-400">อุปกรณ์</div>
           <div className="mt-1 text-sm font-medium text-zinc-900">
             {event.equipment}
           </div>

@@ -7,6 +7,7 @@ import {
   FileText,
 } from "lucide-react";
 import type { ReportTab } from "../types";
+import type { Role } from "../../../AppShell";
 
 type SegTabProps = {
   active: boolean;
@@ -35,40 +36,39 @@ function SegTab({ active, icon, label, onClick }: SegTabProps) {
 type Props = {
   tab: ReportTab;
   onChange: (tab: ReportTab) => void;
+  role: Role;
 };
 
-export default function ReportsTabs({ tab, onChange }: Props) {
+export default function ReportsTabs({ tab, onChange, role }: Props) {
   return (
     <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-100/60 p-2 shadow-sm">
       <div className="flex items-center gap-2">
-        <SegTab
-          active={tab === "finance"}
-          onClick={() => onChange("finance")}
-          icon={<DollarSign className="h-4 w-4" />}
-          label="การเงิน"
-        />
-
+        {role !== "Stockkeeper" && (
+          <SegTab
+            active={tab === "finance"}
+            onClick={() => onChange("finance")}
+            icon={<DollarSign className="h-4 w-4" />}
+            label="การเงิน"
+          />
+        )}
         <SegTab
           active={tab === "stock"}
           onClick={() => onChange("stock")}
           icon={<Boxes className="h-4 w-4" />}
           label="สต็อก"
         />
-
         <SegTab
           active={tab === "events"}
           onClick={() => onChange("events")}
           icon={<CalendarDays className="h-4 w-4" />}
           label="อีเวนต์"
         />
-
         <SegTab
           active={tab === "damage"}
           onClick={() => onChange("damage")}
           icon={<AlertTriangle className="h-4 w-4" />}
           label="ความเสียหาย"
         />
-
         <SegTab
           active={tab === "docs"}
           onClick={() => onChange("docs")}

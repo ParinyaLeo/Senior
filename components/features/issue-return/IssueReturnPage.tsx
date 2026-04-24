@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import type { StockRow } from "../../AppShell";
+import type { Role, StockRow } from "../../AppShell";
 import type {
   EquipmentItem,
   EventEquipmentItem,
@@ -33,16 +33,17 @@ import ConfirmIssueModal from "./modals/ConfirmIssueModal";
 import ConfirmReturnModal from "./modals/ConfirmReturnModal";
 
 type Props = {
+  role: Role;
   stockData: StockRow[];
   onDeductStock: (equipmentList: { name: string; qty: number }[]) => void;
   onReturnStock: (equipmentList: { name: string; qty: number }[]) => void;
   onMarkDamagedStock: (equipmentList: { name: string; qty: number }[]) => void;
   onMarkEventAsIssued?: (eventId: string) => void;
-  // ✅ เพิ่ม prop นี้
   onUnmarkEventAsIssued?: (eventId: string) => void;
 };
 
 export default function IssueReturnPage({
+  role,
   stockData,
   onDeductStock,
   onReturnStock,
@@ -79,7 +80,6 @@ export default function IssueReturnPage({
     loadEvents();
   }, []);
 
-  // ✅ reload เมื่อ Manager อนุมัติใหม่
   useEffect(() => {
     const onReload = async () => {
       try {
@@ -134,9 +134,7 @@ export default function IssueReturnPage({
 
   const handleConfirmReturn = async (damaged: boolean, photos: File[]) => {
     if (!confirmReturnEvent) return;
-
     try {
-      // Step 1: บันทึก issueStatus = returned
       const res = await fetch(`/api/events/${confirmReturnEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -154,12 +152,9 @@ export default function IssueReturnPage({
       }
 
       setEvents((prev) => prev.map((e) => e.id === confirmReturnEvent.id ? { ...e, status: "returned" } : e));
-
-      // ✅ แจ้ง EventsPage ให้ reload + ปลดล็อคปุ่มจัดการอุปกรณ์
       window.dispatchEvent(new CustomEvent("app:event:returned"));
       onUnmarkEventAsIssued?.(confirmReturnEvent.id);
 
-      // Step 2: reset status กลับเป็น pending
       fetch(`/api/events/${confirmReturnEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -210,7 +205,14 @@ export default function IssueReturnPage({
         <IssueReturnHeader onOpenQuickIssue={() => setIsQuickIssueOpen(true)} onOpenQuickReturn={() => setIsQuickReturnOpen(true)} />
         <IssueReturnStats stats={stats} />
         <IssueReturnTabs tab={tab} issueCount={issueList.length} inUseCount={inUseList.length} returnCount={returnList.length} onChange={setTab} />
-        <IssueReturnEventList tab={tab} events={visibleList} emptyText={emptyText} onIssueClick={handleIssueClick} onReturnClick={handleReturnClick} />
+        <IssueReturnEventList
+          role={role}
+          tab={tab}
+          events={visibleList}
+          emptyText={emptyText}
+          onIssueClick={handleIssueClick}
+          onReturnClick={handleReturnClick}
+        />
         <div className="h-10" />
       </div>
     </>

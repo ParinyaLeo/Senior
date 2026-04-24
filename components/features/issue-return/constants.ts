@@ -8,17 +8,17 @@ export const ISSUE_RETURN_TABS: {
 }[] = [
   {
     key: "issue",
-    label: "Issue Equipment",
+    label: "เบิกอุปกรณ์",
     icon: ArrowRight,
   },
   {
     key: "inuse",
-    label: "In Use",
+    label: "กำลังใช้งาน",
     icon: Package,
   },
   {
     key: "return",
-    label: "Return Equipment",
+    label: "คืนอุปกรณ์",
     icon: CornerDownLeft,
   },
 ];

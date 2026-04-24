@@ -1,9 +1,11 @@
 import React from "react";
 import { Package2 } from "lucide-react";
 import type { IssueEvent, TabKey } from "../types";
+import type { Role } from "../../../AppShell";
 import IssueReturnEventCard from "./IssueReturnEventCard";
 
 type Props = {
+  role: Role;
   tab: TabKey;
   events: IssueEvent[];
   emptyText: string;
@@ -12,6 +14,7 @@ type Props = {
 };
 
 export default function IssueReturnEventList({
+  role,
   tab,
   events,
   emptyText,
@@ -33,6 +36,7 @@ export default function IssueReturnEventList({
             key={ev.id}
             event={ev}
             tab={tab}
+            role={role}
             onIssueClick={onIssueClick}
             onReturnClick={onReturnClick}
           />

@@ -48,12 +48,7 @@ export default function EventsReportSection({
                 <ReportsStatusPill tone={e.status.tone} text={e.status.text} />
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="text-sm text-zinc-700">
-                  <div className="text-xs text-zinc-400">วันที่:</div>
-                  <div className="mt-1 font-medium">{e.date}</div>
-                </div>
-
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="text-sm text-zinc-700">
                   <div className="text-xs text-zinc-400">รายได้:</div>
                   <div className="mt-1 font-semibold">
