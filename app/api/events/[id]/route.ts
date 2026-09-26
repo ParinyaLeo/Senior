@@ -195,17 +195,30 @@ function normalizeWorkOrderSalesTargets(value: unknown): WorkOrderSalesTargets {
   };
 }
 
-function isValidWorkOrderSalesTargets(value: unknown): boolean {
-  if (!value || typeof value !== "object") return false;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-  const source = value as Record<string, unknown>;
-  if (source.rows !== undefined && !Array.isArray(source.rows)) return false;
-  if (source.carModelOptions !== undefined && !Array.isArray(source.carModelOptions)) return false;
-  if (source.totals !== undefined && (source.totals === null || typeof source.totals !== "object")) {
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+// ตรวจรูปแบบเป้ายอดขายก่อนบันทึก: ต้องส่งมาครบทั้ง rows / totals / carModelOptions และชนิดถูกต้อง
+// (ถ้าไม่ตรวจ ค่าผิดชนิด เช่น string หรือ totals ที่ไม่ใช่ object จะถูก normalize เป็นค่าว่างแล้วเขียนทับข้อมูลเดิมเงียบๆ)
+function isValidWorkOrderSalesTargets(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  const { rows, totals, carModelOptions } = value;
+
+  if (!Array.isArray(rows)) return false;
+  const rowFields = ["id", "displayModel", "displayQty", "testDriveModel", "testDriveQty"];
+  if (!rows.every((row) => isPlainObject(row) && rowFields.every((key) => isOptionalString(row[key])))) {
     return false;
   }
 
-  return true;
+  if (!isPlainObject(totals)) return false;
+  if (!isOptionalString(totals.bookingTarget) || !isOptionalString(totals.interestedTarget)) return false;
+
+  return Array.isArray(carModelOptions) && carModelOptions.every((option) => typeof option === "string");
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
