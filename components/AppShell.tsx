@@ -372,6 +372,11 @@ export default function AppShell({ user }: { user: SessionUser }) {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const [stockData, setStockData] = useState<StockRow[]>(initialStock);
+  // รายการล่าสุดสำหรับ applyStockChange (คำนวณส่วนต่างนอก state updater)
+  const stockDataRef = React.useRef<StockRow[]>(stockData);
+  useEffect(() => {
+    stockDataRef.current = stockData;
+  }, [stockData]);
   const [stockSaveError, setStockSaveError] = useState<string | null>(null);
 
   const [issuedEventIds, setIssuedEventIds] = useState<Set<string>>(new Set());
@@ -439,28 +444,43 @@ export default function AppShell({ user }: { user: SessionUser }) {
     loadStock();
   }, []);
 
+  // ส่งเฉพาะส่วนที่เปลี่ยน (แถวที่เพิ่ม/แก้ + id ที่เพิ่ม/ลบ) ไม่ส่งทั้งรายการ — ถ้าส่งทั้งรายการ ผู้ใช้ที่เปิดหน้าค้างไว้
+  // จะไปลบ/ทับอุปกรณ์ที่ผู้ใช้อื่นเพิ่งเพิ่ม (server ไม่ลบแถวที่ไม่ได้ระบุแล้ว)
+  // fetch อยู่นอก state updater เพราะ StrictMode เรียก updater ซ้ำ 2 ครั้ง ทำให้ยิง request ซ้ำ
   const applyStockChange = (
     updater: StockRow[] | ((prev: StockRow[]) => StockRow[])
   ) => {
-    setStockData((prev) => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      fetch("/api/stock", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: next }),
-      })
-        .then(async (res) => {
-          if (res.ok) return;
-          const data = await res.json().catch(() => null);
-          setStockData(prev);
-          setStockSaveError(data?.error || "บันทึกข้อมูลสต็อกไม่สำเร็จ — ข้อมูลถูกย้อนกลับแล้ว");
-        })
-        .catch(() => {
-          setStockData(prev);
-          setStockSaveError("บันทึกข้อมูลสต็อกไม่สำเร็จ — ข้อมูลถูกย้อนกลับแล้ว");
-        });
-      return next;
+    const prev = stockDataRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    stockDataRef.current = next;
+    setStockData(next);
+
+    const prevById = new Map(prev.map((row) => [row.id, row]));
+    const nextIds = new Set(next.map((row) => row.id));
+    const createdIds = next.filter((row) => !prevById.has(row.id)).map((row) => row.id);
+    const deletedIds = prev.filter((row) => !nextIds.has(row.id)).map((row) => row.id);
+    const items = next.filter((row) => {
+      const before = prevById.get(row.id);
+      return !before || JSON.stringify(before) !== JSON.stringify(row);
     });
+    if (items.length === 0 && deletedIds.length === 0) return;
+
+    const rollback = (message: string) => {
+      stockDataRef.current = prev;
+      setStockData(prev);
+      setStockSaveError(message);
+    };
+    fetch("/api/stock", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items, createdIds, deletedIds }),
+    })
+      .then(async (res) => {
+        if (res.ok) return;
+        const data = await res.json().catch(() => null);
+        rollback(data?.error || "บันทึกข้อมูลสต็อกไม่สำเร็จ — ข้อมูลถูกย้อนกลับแล้ว");
+      })
+      .catch(() => rollback("บันทึกข้อมูลสต็อกไม่สำเร็จ — ข้อมูลถูกย้อนกลับแล้ว"));
   };
 
   // Calls the server to perform an atomic stock adjustment, then merges updated rows into local state
@@ -612,12 +632,16 @@ export default function AppShell({ user }: { user: SessionUser }) {
   const openNotifications = async () => {
     try {
       const res = await fetch("/api/notifications");
+      let hasUnread = unread > 0;
       if (res.ok) {
         const data = (await res.json()) as NotificationItem[];
         setNotifList(data);
+        // ตัวนับ unread ในเครื่องโหลดครั้งเดียวตอนเปิดหน้า แจ้งเตือนที่ผู้ใช้อื่นสร้างทีหลังไม่ทำให้มันเพิ่ม
+        // จึงตัดสินจากรายการที่เพิ่งโหลดมาด้วย ไม่งั้นเปิดกระดิ่งแล้วแจ้งเตือนใหม่จะค้างเป็นยังไม่อ่าน
+        hasUnread = hasUnread || data.some((n) => n.unreadFor.includes(role));
       }
       setNotifOpen(true);
-      if (unread > 0) {
+      if (hasUnread) {
         await fetch("/api/notifications/mark-read", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

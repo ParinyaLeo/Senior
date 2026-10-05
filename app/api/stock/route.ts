@@ -49,7 +49,7 @@ export async function GET() {
   return NextResponse.json(rows.map(mapFromDb));
 }
 
-// Full stock sync from the management page (add / edit / delete items)
+// Stock changes from the management page (add / edit / delete items)
 export async function PUT(req: NextRequest) {
   const auth = await requireUser("Manager", "Stockkeeper");
   if ("response" in auth) return auth.response;
@@ -78,17 +78,34 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "ข้อความมีอักขระที่ไม่รองรับ กรุณาลบแล้วลองใหม่" }, { status: 400 });
   }
 
-  // PUT เป็นการ sync ทั้งตาราง แถวที่ไม่อยู่ใน payload จะถูกลบ — การลบอุปกรณ์ทำได้เฉพาะผู้จัดการ (ตามปุ่มลบในหน้าสต็อก)
-  if (auth.user.role !== "Manager") {
-    const keep = new Set(items.map((it) => it.id));
-    const existing = await listStockItems();
-    if (existing.some((row) => !keep.has(row.id))) {
-      return NextResponse.json({ error: "ไม่มีสิทธิ์ลบอุปกรณ์ออกจากสต็อก" }, { status: 403 });
+  // client ส่งเฉพาะแถวที่เพิ่ม/แก้ (items) + id ที่เพิ่มใหม่ (createdIds) + id ที่ลบ (deletedIds)
+  // แถวอื่นไม่ถูกแตะ — กันผู้ใช้ที่ถือรายการเก่าไปลบ/ทับของที่คนอื่นเพิ่งเพิ่ม
+  const isIdList = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+  const createdIds = body.createdIds === undefined ? [] : body.createdIds;
+  const deletedIds = body.deletedIds === undefined ? [] : body.deletedIds;
+  if (!isIdList(createdIds) || !isIdList(deletedIds) || containsNullByte([createdIds, deletedIds])) {
+    return NextResponse.json({ error: "invalid payload" }, { status: 400 });
+  }
+
+  // การลบอุปกรณ์ทำได้เฉพาะผู้จัดการ (ตามปุ่มลบในหน้าสต็อก)
+  if (deletedIds.length > 0 && auth.user.role !== "Manager") {
+    return NextResponse.json({ error: "ไม่มีสิทธิ์ลบอุปกรณ์ออกจากสต็อก" }, { status: 403 });
+  }
+
+  // รหัสอุปกรณ์ใหม่สร้างจากรายการในเครื่องผู้ใช้ — ถ้ามีคนเพิ่มรหัสเดียวกันไปก่อน ต้องไม่ทับของเขา
+  if (createdIds.length > 0) {
+    const existingIds = new Set((await listStockItems()).map((row) => row.id));
+    const taken = createdIds.filter((id) => existingIds.has(id));
+    if (taken.length > 0) {
+      return NextResponse.json(
+        { error: `รหัสอุปกรณ์ ${taken.join(", ")} ถูกใช้ไปแล้ว (อาจมีผู้ใช้อื่นเพิ่มพร้อมกัน) กรุณารีเฟรชหน้าแล้วลองใหม่` },
+        { status: 409 }
+      );
     }
   }
 
   try {
-    await upsertStockItems(items);
+    await upsertStockItems(items, deletedIds);
   } catch (err) {
     if (err && typeof err === "object" && "code" in err && (err.code === "23001" || err.code === "23503")) {
       return NextResponse.json(

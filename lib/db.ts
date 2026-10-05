@@ -1217,7 +1217,8 @@ async function insertStockHistory(
   );
 }
 
-export async function upsertStockItems(items: StockItemInput[]) {
+// items = แถวที่เพิ่ม/แก้ (upsert), deletedIds = แถวที่ลบ — แถวอื่นในตารางไม่ถูกแตะ
+export async function upsertStockItems(items: StockItemInput[], deletedIds: string[] = []) {
   const client = await pool.connect();
   try {
     await ensureStockTable(client);
@@ -1246,15 +1247,10 @@ export async function upsertStockItems(items: StockItemInput[]) {
       );
     }
 
-    // Delete items removed from the list
-    const activeIds = items.map(i => i.id);
-    if (activeIds.length > 0) {
-      await client.query(
-        `DELETE FROM stock_items WHERE NOT (id = ANY($1::text[]))`,
-        [activeIds]
-      );
-    } else {
-      await client.query(`DELETE FROM stock_items`);
+    // ลบเฉพาะ id ที่ระบุมาตรงๆ — เดิมลบทุกแถวที่ไม่อยู่ใน items ทำให้ client ที่ถือรายการเก่า (มีคนอื่นเพิ่มของหลังเปิดหน้า)
+    // ลบของคนอื่นทิ้งเงียบๆ และถ้า items ว่างจะลบทั้งตาราง
+    if (deletedIds.length > 0) {
+      await client.query(`DELETE FROM stock_items WHERE id = ANY($1::text[])`, [deletedIds]);
     }
 
     // Record history for every changed numeric field on existing items
