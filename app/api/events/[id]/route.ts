@@ -7,6 +7,7 @@ import {
   confirmEventPayment,
   deleteEventById,
   getEventById,
+  insertNotification,
   issueEquipmentAtomic,
   returnEquipmentQuickAtomic,
   returnEventFullAtomic,
@@ -58,11 +59,12 @@ function isEventDeleteBlockedError(err: unknown) {
 
 // อัปโหลดสลิปการชำระเงิน: รับเป็น multipart/form-data แล้วเขียนไฟล์ลงดิสก์
 // (ไม่เก็บ base64 ก้อนใหญ่ใน DB เพราะ data URI ที่ยาวเกิน ~2MB เปิดในแท็บใหม่ไม่ได้บนเบราว์เซอร์ตระกูล Chromium)
-async function handleUploadReceiptForm(req: NextRequest, id: string) {
+async function handleUploadReceiptForm(req: NextRequest, id: string, userId: string) {
   const formData = await req.formData();
 
   const current = await getEventById(id);
-  if (!current) {
+  // ตอบ 404 เหมือนไม่มีอีเวนต์นี้ ถ้าไม่ใช่เจ้าของ (ไม่บอกว่า id ของลูกค้าคนอื่นมีอยู่จริง)
+  if (!current || current.created_by !== userId) {
     return NextResponse.json({ error: "event not found" }, { status: 404 });
   }
 
@@ -225,7 +227,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     // แนบสลิปการชำระเงิน: เฉพาะลูกค้า (เดิมเช็คจาก formData role ที่ client ส่งมา)
     const auth = await requireUser("SA");
     if ("response" in auth) return auth.response;
-    return handleUploadReceiptForm(req, id);
+    return handleUploadReceiptForm(req, id, auth.user.id);
   }
 
   const body = await req.json().catch(() => null);
@@ -416,6 +418,19 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       return NextResponse.json({ error: "event not found" }, { status: 404 });
     }
 
+    // แจ้งเจ้าของอีเวนต์ฝั่ง server เพราะหลังลบแล้ว client จะหาเจ้าของจาก eventId ไม่ได้อีก
+    if (current.created_by) {
+      await insertNotification({
+        id: `NTF-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+        title: "ไม่อนุมัติอีเวนต์",
+        message: `${current.title} ไม่อนุมัติและถูกลบออกจากระบบแล้ว`,
+        audience: ["SA"],
+        unread: ["SA"],
+        createdAt: new Date().toISOString(),
+        recipientUserId: current.created_by,
+      });
+    }
+
     return NextResponse.json({ ok: true, deleted: true });
   }
 
@@ -448,7 +463,7 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
   if ("response" in auth) return auth.response;
   const { id } = await context.params;
   const current = await getEventById(id);
-  if (!current) {
+  if (!current || current.created_by !== auth.user.id) {
     return NextResponse.json({ error: "event not found" }, { status: 404 });
   }
   if (current.status_text !== "รออนุมัติ" || current.issue_status === "inuse") {

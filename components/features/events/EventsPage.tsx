@@ -218,7 +218,7 @@ export default function EventsPage({
     [roleEvents]
   );
 
-  const pushNotification = (data: { title: string; message: string; audience: Role[] }) => {
+  const pushNotification = (data: { title: string; message: string; audience: Role[]; eventId?: string }) => {
     fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -496,6 +496,7 @@ export default function EventsPage({
         title: "ยืนยันการชำระเงินแล้ว",
         message: `${targetEvent?.title ?? "อีเวนต์"} ชำระเงินเรียบร้อยและปิดงานแล้ว`,
         audience: ["SA"],
+        eventId,
       });
       setToast(`ยืนยันการชำระเงินแล้ว: "${targetEvent?.title ?? "อีเวนต์"}"`);
     } catch {
@@ -594,11 +595,7 @@ export default function EventsPage({
                 return { ...prev, events: nextEvents };
               });
               if (detailEventId === manageEventId) setDetailEventId(null);
-              pushNotification({
-                title: "ไม่อนุมัติอีเวนต์",
-                message: `${eventTitle} ไม่อนุมัติและถูกลบออกจากระบบแล้ว`,
-                audience: ["SA"],
-              });
+              // แจ้งเจ้าของอีเวนต์ทำฝั่ง server ใน PATCH decision แล้ว (ลบอีเวนต์ไปแล้ว client หาเจ้าของไม่ได้)
               setToast(`ไม่อนุมัติและลบอีเวนต์แล้ว: "${eventTitle}"`);
               return;
             }
@@ -619,7 +616,7 @@ export default function EventsPage({
               };
             }));
             onDeductStock(equipment.map((eq) => ({ name: eq.name, qty: eq.qty })));
-            pushNotification({ title: "อนุมัติอุปกรณ์อีเวนต์", message: `${eventTitle} อนุมัติรายการอุปกรณ์แล้ว`, audience: ["SA", "Stockkeeper"] });
+            pushNotification({ title: "อนุมัติอุปกรณ์อีเวนต์", message: `${eventTitle} อนุมัติรายการอุปกรณ์แล้ว`, audience: ["SA", "Stockkeeper"], eventId: manageEventId });
             window.dispatchEvent(new CustomEvent("app:event:approved"));
             setToast(`บันทึกแล้ว: "${eventTitle}" ถูกอนุมัติ`);
           } catch (err) {

@@ -1,6 +1,7 @@
 "use server";
 
 import { Pool, PoolClient, QueryResult } from "pg";
+import { ensureAuthTables } from "./authSchema";
 
 // อ่าน connection string จาก env ก่อน ถ้าไม่มีจะ fallback ไป PostgreSQL local
 const connectionString =
@@ -102,6 +103,8 @@ export type EventRow = {
   receipt_data_url: string | null;
   receipt_uploaded_at: string | null;
   receipt_file_path: string | null;
+  // บัญชีลูกค้าที่สร้างอีเวนต์ (users.id) — NULL = อีเวนต์ที่สร้างก่อนมีระบบบัญชี ไม่มีเจ้าของ
+  created_by: string | null;
 };
 
 // รูปแบบข้อมูล stock item ที่อ่านจากตาราง stock_items
@@ -231,6 +234,12 @@ async function ensureNotificationsTable(client?: PoolClient) {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    // แจ้งเตือนถึงลูกค้าส่งรายคน: role SA จะเห็นเฉพาะแถวที่ recipient_user_id ตรงกับตัวเอง
+    // (แจ้งเตือนถึงพนักงานยังส่งตาม role เหมือนเดิม คอลัมน์นี้เป็น NULL)
+    await c.query(`
+      ALTER TABLE notifications
+      ADD COLUMN IF NOT EXISTS recipient_user_id TEXT;
+    `);
   } finally {
     if (!client) c.release();
   }
@@ -325,6 +334,19 @@ async function ensureEventsTable(client?: PoolClient) {
       ALTER TABLE events
       ADD COLUMN IF NOT EXISTS event_type TEXT;
     `);
+    // เจ้าของอีเวนต์ — ตาราง users ต้องมีก่อนจึงจะผูก FK ได้
+    await ensureAuthTables(c);
+    await c.query(`
+      ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS created_by TEXT;
+    `);
+    await addForeignKeyIfNotExists(
+      c,
+      "events_created_by_fkey",
+      `ALTER TABLE events ADD CONSTRAINT events_created_by_fkey
+       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL`
+    );
+    await c.query(`CREATE INDEX IF NOT EXISTS events_created_by_idx ON events (created_by);`);
     // เลข Event ออกจาก sequence เพื่อไม่ให้เลขของ Event ที่ลบไปแล้วถูกนำกลับมาใช้ซ้ำ
     // (เลขเอกสาร INV-/QT-/WO- อิงจาก id) — seed จากเลขสูงสุดที่มีอยู่ครั้งเดียวตอนที่ sequence ยังไม่เคยถูกใช้
     await c.query(`CREATE SEQUENCE IF NOT EXISTS events_id_seq;`);
@@ -596,31 +618,36 @@ export async function insertNotification(payload: {
   audience: string[];
   unread: string[];
   createdAt: string;
+  // ผู้รับฝั่งลูกค้า (เจ้าของอีเวนต์) — ใช้เมื่อ audience มี "SA"
+  recipientUserId?: string | null;
 }) {
   const client = await pool.connect();
   try {
     await ensureNotificationsTable(client);
     await client.query(
-      `INSERT INTO notifications (id, title, message, audience, unread_for, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [payload.id, payload.title, payload.message, payload.audience, payload.unread, payload.createdAt]
+      `INSERT INTO notifications (id, title, message, audience, unread_for, created_at, recipient_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [payload.id, payload.title, payload.message, payload.audience, payload.unread, payload.createdAt, payload.recipientUserId ?? null]
     );
   } finally {
     client.release();
   }
 }
 
+// recipientUserId ของฟังก์ชัน notification ด้านล่าง: ส่ง user id เมื่อผู้เรียกเป็นลูกค้า (เห็น/แก้ได้เฉพาะแถวของตัวเอง)
+// ส่ง null เมื่อเป็นพนักงาน (แจ้งเตือนแชร์กันตาม role เหมือนเดิม)
+
 // ดึง notification ทั้งหมดที่ role นี้มีสิทธิ์เห็น เรียงจากใหม่ไปเก่า
-export async function listNotificationsForRole(role: string): Promise<NotificationRow[]> {
+export async function listNotificationsForRole(role: string, recipientUserId: string | null): Promise<NotificationRow[]> {
   const client = await pool.connect();
   try {
     await ensureNotificationsTable(client);
     const res: QueryResult<NotificationRow> = await client.query(
       `SELECT id, title, message, audience, unread_for, created_at
        FROM notifications
-       WHERE $1 = ANY(audience)
+       WHERE $1 = ANY(audience) AND ($2::text IS NULL OR recipient_user_id = $2)
        ORDER BY created_at DESC`,
-      [role]
+      [role, recipientUserId]
     );
     return res.rows;
   } finally {
@@ -645,7 +672,7 @@ export async function deleteOldNotifications(days = 30): Promise<number> {
 }
 
 // ลบแจ้งเตือนออกจาก role เดียว ถ้าไม่มี role ไหนเห็นแล้วจะลบ row ทิ้งจริง
-export async function deleteNotificationForRole(role: string, id: string): Promise<number> {
+export async function deleteNotificationForRole(role: string, id: string, recipientUserId: string | null): Promise<number> {
   const client = await pool.connect();
   try {
     await ensureNotificationsTable(client);
@@ -654,8 +681,8 @@ export async function deleteNotificationForRole(role: string, id: string): Promi
        SET
          audience = array_remove(audience, $1),
          unread_for = array_remove(unread_for, $1)
-       WHERE id = $2 AND $1 = ANY(audience)`,
-      [role, id]
+       WHERE id = $2 AND $1 = ANY(audience) AND ($3::text IS NULL OR recipient_user_id = $3)`,
+      [role, id, recipientUserId]
     );
     await client.query(
       `DELETE FROM notifications
@@ -668,7 +695,7 @@ export async function deleteNotificationForRole(role: string, id: string): Promi
 }
 
 // ล้างแจ้งเตือนทั้งหมดของ role ปัจจุบันใน popup
-export async function deleteNotificationsForRole(role: string): Promise<number> {
+export async function deleteNotificationsForRole(role: string, recipientUserId: string | null): Promise<number> {
   const client = await pool.connect();
   try {
     await ensureNotificationsTable(client);
@@ -677,8 +704,8 @@ export async function deleteNotificationsForRole(role: string): Promise<number> 
        SET
          audience = array_remove(audience, $1),
          unread_for = array_remove(unread_for, $1)
-       WHERE $1 = ANY(audience)`,
-      [role]
+       WHERE $1 = ANY(audience) AND ($2::text IS NULL OR recipient_user_id = $2)`,
+      [role, recipientUserId]
     );
     await client.query(
       `DELETE FROM notifications
@@ -691,15 +718,15 @@ export async function deleteNotificationsForRole(role: string): Promise<number> 
 }
 
 // นับจำนวน notification ที่ role นี้ยังไม่ได้อ่าน
-export async function countUnread(role: string): Promise<number> {
+export async function countUnread(role: string, recipientUserId: string | null): Promise<number> {
   const client = await pool.connect();
   try {
     await ensureNotificationsTable(client);
     const res = await client.query<{ count: string }>(
       `SELECT COUNT(*)::int as count
        FROM notifications
-       WHERE $1 = ANY(audience) AND $1 = ANY(unread_for)`,
-      [role]
+       WHERE $1 = ANY(audience) AND $1 = ANY(unread_for) AND ($2::text IS NULL OR recipient_user_id = $2)`,
+      [role, recipientUserId]
     );
     return Number(res.rows[0]?.count ?? 0);
   } finally {
@@ -708,7 +735,7 @@ export async function countUnread(role: string): Promise<number> {
 }
 
 // mark notification เป็นอ่านแล้ว โดยเอา role ออกจาก unread_for จะระบุ ids หรืออ่านทั้งหมดก็ได้
-export async function markRead(role: string, ids?: string[]) {
+export async function markRead(role: string, ids: string[] | undefined, recipientUserId: string | null) {
   const client = await pool.connect();
   try {
     await ensureNotificationsTable(client);
@@ -716,15 +743,15 @@ export async function markRead(role: string, ids?: string[]) {
       await client.query(
         `UPDATE notifications
          SET unread_for = array_remove(unread_for, $1)
-         WHERE id = ANY($2::text[]) AND $1 = ANY(unread_for)`,
-        [role, ids]
+         WHERE id = ANY($2::text[]) AND $1 = ANY(unread_for) AND ($3::text IS NULL OR recipient_user_id = $3)`,
+        [role, ids, recipientUserId]
       );
     } else {
       await client.query(
         `UPDATE notifications
          SET unread_for = array_remove(unread_for, $1)
-         WHERE $1 = ANY(unread_for)`,
-        [role]
+         WHERE $1 = ANY(unread_for) AND ($2::text IS NULL OR recipient_user_id = $2)`,
+        [role, recipientUserId]
       );
     }
   } finally {
@@ -739,7 +766,8 @@ export async function getPool() {
 }
 
 // ดึงรายการ Event ทั้งหมดจากฐานข้อมูลเพื่อส่งให้ API/UI
-export async function listEvents(): Promise<EventRow[]> {
+// ownerId: ระบุเมื่อผู้เรียกเป็นลูกค้า → คืนเฉพาะอีเวนต์ที่ลูกค้าคนนั้นสร้าง (อีเวนต์ไม่มีเจ้าของจะไม่ถูกรวม)
+export async function listEvents(ownerId?: string): Promise<EventRow[]> {
   const client = await pool.connect();
   try {
     await ensureEventsTable(client);
@@ -748,10 +776,13 @@ export async function listEvents(): Promise<EventRow[]> {
          description, company, place, start_date, end_date, items_count,
          organizer, branch_code, budget_thb, attendees, work_format, work_nature, event_size, event_type, contact_name, contact_phone,
          customer_email, customer_tax_id, equipment, work_order_sales_targets,
-         receipt_file_name, receipt_file_type, receipt_data_url, receipt_uploaded_at, receipt_file_path
+         receipt_file_name, receipt_file_type, receipt_data_url, receipt_uploaded_at, receipt_file_path,
+         created_by
        FROM events
        WHERE status_tone <> 'rejected' AND status_text <> 'ไม่อนุมัติ'
-       ORDER BY created_at DESC, id DESC`
+         AND ($1::text IS NULL OR created_by = $1)
+       ORDER BY created_at DESC, id DESC`,
+      [ownerId ?? null]
     );
     return res.rows;
   } finally {
@@ -769,7 +800,8 @@ export async function getEventById(id: string): Promise<EventRow | null> {
          description, company, place, start_date, end_date, items_count,
          organizer, branch_code, budget_thb, attendees, work_format, work_nature, event_size, event_type, contact_name, contact_phone,
          customer_email, customer_tax_id, equipment, work_order_sales_targets,
-         receipt_file_name, receipt_file_type, receipt_data_url, receipt_uploaded_at, receipt_file_path
+         receipt_file_name, receipt_file_type, receipt_data_url, receipt_uploaded_at, receipt_file_path,
+         created_by
        FROM events WHERE id = $1 LIMIT 1`,
       [id]
     );
@@ -817,6 +849,7 @@ export async function insertEvent(payload: {
   customerEmail?: string;
   customerTaxId?: string;
   equipment?: EventEquipmentRow[];
+  createdBy?: string | null;
 }) {
   const client = await pool.connect();
   try {
@@ -826,8 +859,8 @@ export async function insertEvent(payload: {
         id, title, status_text, status_tone, created_at, description, company, place,
         start_date, end_date, items_count, organizer, branch_code, budget_thb, attendees,
         work_format, work_nature, event_size, event_type,
-        contact_name, contact_phone, customer_email, customer_tax_id, equipment, issue_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25)`,
+        contact_name, contact_phone, customer_email, customer_tax_id, equipment, issue_status, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, $26)`,
       [
         payload.id, payload.title, payload.statusText, payload.statusTone,
         payload.createdAt, payload.description, payload.company, payload.place,
@@ -838,7 +871,7 @@ export async function insertEvent(payload: {
         payload.eventSize ?? null, payload.eventType ?? null,
         payload.contactName ?? null, payload.contactPhone ?? null,
         payload.customerEmail ?? null, payload.customerTaxId ?? null,
-        JSON.stringify(payload.equipment ?? []), "ready",
+        JSON.stringify(payload.equipment ?? []), "ready", payload.createdBy ?? null,
       ]
     );
   } finally {

@@ -202,7 +202,7 @@ export default function IssueReturnPage({
       };
     });
 
-  const pushNotification = (data: { title: string; message: string; audience: Role[] }) => {
+  const pushNotification = (data: { title: string; message: string; audience: Role[]; eventId?: string }) => {
     fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -325,6 +325,7 @@ export default function IssueReturnPage({
         title: "รอชำระเงิน",
         message: `${confirmReturnEvent.title} คืนอุปกรณ์ครบแล้ว กรุณาชำระเงินและแนบใบเสร็จ`,
         audience: ["SA"],
+        eventId: confirmReturnEvent.id,
       });
 
       const totalPhotos = returnItems.reduce((sum, i) => sum + i.photos.length, 0);
@@ -478,6 +479,7 @@ export default function IssueReturnPage({
           title: "รอชำระเงิน",
           message: `${selectedEvent?.title ?? "อีเวนต์"} คืนอุปกรณ์ครบแล้ว กรุณาชำระเงินและแนบใบเสร็จ`,
           audience: ["SA"],
+          eventId,
         });
       }
 

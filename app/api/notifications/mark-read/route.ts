@@ -14,6 +14,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "ข้อความมีอักขระที่ไม่รองรับ กรุณาลบแล้วลองใหม่" }, { status: 400 });
   }
   const ids = Array.isArray(body?.ids) ? body.ids : undefined;
-  await markRead(role, ids);
+  // ลูกค้า mark ได้เฉพาะแจ้งเตือนของตัวเอง ไม่งั้นจะไปลบสถานะ "ยังไม่อ่าน" ของลูกค้าคนอื่นด้วย
+  await markRead(role, ids, role === "SA" ? auth.user.id : null);
   return NextResponse.json({ ok: true });
 }

@@ -53,7 +53,8 @@ function mapEvent(row: EventRow) {
 export async function GET() {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
-  const rows = await listEvents();
+  // ลูกค้าเห็นเฉพาะอีเวนต์ที่ตัวเองสร้าง (อีเวนต์เก่าที่ไม่มีเจ้าของจะไม่แสดงให้ลูกค้า) ส่วนพนักงานเห็นทั้งหมดเหมือนเดิม
+  const rows = await listEvents(auth.user.role === "SA" ? auth.user.id : undefined);
   return NextResponse.json(rows.map(mapEvent));
 }
 
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
     customerEmail: customerEmail || undefined,
     customerTaxId: customerTaxId || undefined,
     equipment: [],
+    createdBy: auth.user.id,
   });
 
   return NextResponse.json({
