@@ -245,6 +245,8 @@ async function ensureNotificationsTable(client?: PoolClient) {
   }
 }
 
+let authTablesReady: Promise<void> | null = null;
+
 // ตรวจและสร้างตาราง Event รวมถึงเติม column ใหม่ที่อาจเพิ่มภายหลัง
 async function ensureEventsTable(client?: PoolClient) {
   const c = client ?? (await pool.connect());
@@ -335,7 +337,12 @@ async function ensureEventsTable(client?: PoolClient) {
       ADD COLUMN IF NOT EXISTS event_type TEXT;
     `);
     // เจ้าของอีเวนต์ — ตาราง users ต้องมีก่อนจึงจะผูก FK ได้
-    await ensureAuthTables(c);
+    // เรียกครั้งเดียวต่อ process: DDL ของ users มี ALTER TABLE ที่ lock ตาราง ถ้ารันทุก request จะชนกับการอ่าน session จน deadlock
+    authTablesReady ??= ensureAuthTables(pool).catch((err) => {
+      authTablesReady = null;
+      throw err;
+    });
+    await authTablesReady;
     await c.query(`
       ALTER TABLE events
       ADD COLUMN IF NOT EXISTS created_by TEXT;

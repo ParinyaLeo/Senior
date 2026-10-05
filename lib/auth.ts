@@ -26,6 +26,7 @@ export const PASSWORD_MAX_LENGTH = 128;
 export type SessionUser = {
   id: string;
   email: string;
+  username: string | null;
   role: AuthRole;
   displayName: string;
   phone: string | null;
@@ -35,6 +36,7 @@ export type SessionUser = {
 type UserRow = {
   id: string;
   email: string;
+  username: string | null;
   password_hash: string;
   role: AuthRole;
   display_name: string;
@@ -69,6 +71,7 @@ function toSessionUser(row: UserRow): SessionUser {
   return {
     id: row.id,
     email: row.email,
+    username: row.username,
     role: row.role,
     displayName: row.display_name,
     phone: row.phone,
@@ -132,14 +135,17 @@ export async function createUser(payload: {
 // (กันการเดาว่าอีเมลไหนมีบัญชีจากเวลาที่ใช้)
 let dummyHash: Promise<string> | null = null;
 
+// identifier = อีเมล หรือ ชื่อผู้ใช้ (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
+// username ห้ามมี "@" (constraint ใน DB) จึงไม่มีทางที่ค่าเดียวตรงกับอีเมลของคนหนึ่งและ username ของอีกคน
 export async function authenticate(
-  email: string,
+  identifier: string,
   password: string
 ): Promise<{ ok: true; user: SessionUser } | { ok: false; reason: "invalid" | "locked" }> {
   const pool = await getAuthPool();
-  const res = await pool.query<UserRow>(`SELECT * FROM users WHERE LOWER(email) = $1`, [
-    normalizeEmail(email),
-  ]);
+  const res = await pool.query<UserRow>(
+    `SELECT * FROM users WHERE LOWER(email) = $1 OR LOWER(username) = $1 LIMIT 1`,
+    [normalizeEmail(identifier)]
+  );
   const row = res.rows[0];
 
   if (!row || !row.is_active) {

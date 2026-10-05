@@ -10,17 +10,17 @@ import RoleSelect, { roleLabel } from "./RoleSelect";
 // เวลาที่แสดงคำเตือน "บทบาทไม่ตรง" ก่อนพาเข้าแอป
 const ROLE_MISMATCH_REDIRECT_MS = 2500;
 
-const EMAIL_PLACEHOLDER: Record<AuthRole | "none", string> = {
-  none: "name@example.com",
+const IDENTIFIER_PLACEHOLDER: Record<AuthRole | "none", string> = {
+  none: "name@example.com หรือชื่อผู้ใช้",
   SA: "อีเมลที่ใช้สมัครสมาชิก",
-  Manager: "อีเมลบัญชีพนักงาน",
-  Stockkeeper: "อีเมลบัญชีพนักงาน",
+  Manager: "อีเมลหรือชื่อผู้ใช้ เช่น manager",
+  Stockkeeper: "อีเมลหรือชื่อผู้ใช้ เช่น stockkeeper",
 };
 
 export default function LoginForm() {
   // บทบาทที่เลือกเป็นแค่ตัวช่วย (ปรับข้อความ/ลิงก์) — สิทธิ์จริงมาจากบัญชีที่ login เสมอ
   const [selectedRole, setSelectedRole] = useState<AuthRole | null>(null);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +36,7 @@ export default function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -63,7 +63,7 @@ export default function LoginForm() {
   return (
     <AuthCard
       title="เข้าสู่ระบบ"
-      subtitle="เลือกบทบาท แล้วกรอกอีเมลและรหัสผ่านของบัญชีคุณ"
+      subtitle="เลือกบทบาท แล้วกรอกอีเมลหรือชื่อผู้ใช้ และรหัสผ่านของบัญชีคุณ"
       footer={
         isStaff ? (
           <span className="text-zinc-500">บัญชีพนักงานสร้างโดยผู้ดูแลระบบ หากเข้าใช้งานไม่ได้กรุณาติดต่อผู้จัดการ</span>
@@ -80,13 +80,15 @@ export default function LoginForm() {
       <form onSubmit={submit} noValidate>
         <RoleSelect value={selectedRole} onChange={setSelectedRole} />
 
-        <AuthField label="อีเมล">
+        <AuthField label="อีเมลหรือชื่อผู้ใช้">
           <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={EMAIL_PLACEHOLDER[selectedRole ?? "none"]}
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder={IDENTIFIER_PLACEHOLDER[selectedRole ?? "none"]}
             className={authInputClass}
           />
         </AuthField>
@@ -130,7 +132,7 @@ export default function LoginForm() {
 
         <button
           type="submit"
-          disabled={submitting || !email || !password}
+          disabled={submitting || !identifier.trim() || !password}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <LogIn className="h-4 w-4" />
