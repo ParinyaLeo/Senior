@@ -10,15 +10,14 @@ import {
   listNotificationsForRole,
 } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
-
-type Role = "SA" | "Manager" | "Stockkeeper";
+import { requireUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const role = req.nextUrl.searchParams.get("role") as Role | null;
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+  // role มาจาก session เท่านั้น (ไม่รับ ?role= จาก client แล้ว)
+  const role = auth.user.role;
   const unreadOnly = req.nextUrl.searchParams.get("unread") === "true";
-  if (!role) {
-    return NextResponse.json({ error: "role is required" }, { status: 400 });
-  }
   await deleteOldNotifications(30);
   const rows = await listNotificationsForRole(role);
   const list = rows.map((r) => ({
@@ -34,6 +33,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
   await deleteOldNotifications(30);
   const body = await req.json().catch(() => null);
   if (!body?.title || !body?.message || !Array.isArray(body?.audience)) {
@@ -55,21 +56,20 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, id, createdAt });
 }
 
-export async function HEAD(req: NextRequest) {
-  const role = req.nextUrl.searchParams.get("role");
-  if (!role) return new NextResponse(null, { status: 400 });
+export async function HEAD() {
+  const auth = await requireUser();
+  if ("response" in auth) return new NextResponse(null, { status: auth.response.status });
+  const role = auth.user.role;
   await deleteOldNotifications(30);
   const total = await countUnread(role);
   return new NextResponse(null, { status: 200, headers: { "x-unread-count": String(total) } });
 }
 
 export async function DELETE(req: NextRequest) {
-  const role = req.nextUrl.searchParams.get("role") as Role | null;
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+  const role = auth.user.role;
   const id = req.nextUrl.searchParams.get("id");
-
-  if (!role) {
-    return NextResponse.json({ error: "role is required" }, { status: 400 });
-  }
 
   await deleteOldNotifications(30);
 

@@ -3,10 +3,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateDamageItemAmounts } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 // แก้ไข "มูลค่าความเสียหาย" และ "มูลค่าเรียกเก็บ" ของรายการความเสียหายหนึ่งแถว
 // เรียกจาก modal แก้ไขในหน้ารายงาน > ความเสียหาย
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser("Manager");
+  if ("response" in auth) return auth.response;
   const { id } = await context.params;
   const body = await req.json().catch(() => null);
 

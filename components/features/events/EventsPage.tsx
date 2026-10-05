@@ -102,7 +102,7 @@ export default function EventsPage({
     const loadEvents = async () => {
       setIsLoadingEvents(true);
       try {
-        const res = await fetch(`/api/events?role=${encodeURIComponent(role)}`);
+        const res = await fetch("/api/events");
         if (!res.ok) throw new Error("failed to fetch events");
         const rows = (await res.json()) as EventApiItem[];
 
@@ -149,7 +149,7 @@ export default function EventsPage({
     const onReload = () => {
       const loadEvents = async () => {
         try {
-          const res = await fetch(`/api/events?role=${encodeURIComponent(role)}`);
+          const res = await fetch("/api/events");
           if (!res.ok) return;
           const rows = (await res.json()) as EventApiItem[];
           setEvents(rows.map((r) => {
@@ -432,7 +432,6 @@ export default function EventsPage({
     try {
       const formData = new FormData();
       formData.append("paymentAction", "uploadReceipt");
-      formData.append("role", role);
       formData.append("file", file);
 
       const res = await fetch(`/api/events/${eventId}`, {
@@ -476,7 +475,7 @@ export default function EventsPage({
       const res = await fetch(`/api/events/${eventId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentAction: "confirmPayment", role }),
+        body: JSON.stringify({ paymentAction: "confirmPayment" }),
       });
       if (!res.ok) throw new Error("failed to confirm payment");
 

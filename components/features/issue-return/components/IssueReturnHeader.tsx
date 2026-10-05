@@ -2,11 +2,14 @@ import React from "react";
 import { CornerDownLeft, Plus } from "lucide-react";
 
 type Props = {
+  // เบิก/คืนเป็นสิทธิ์ของเจ้าหน้าที่คลังเท่านั้น (API ตอบ 403 ให้ role อื่น) จึงซ่อนปุ่มสำหรับ role อื่น
+  showQuickActions: boolean;
   onOpenQuickIssue: () => void;
   onOpenQuickReturn: () => void;
 };
 
 export default function IssueReturnHeader({
+  showQuickActions,
   onOpenQuickIssue,
   onOpenQuickReturn,
 }: Props) {
@@ -21,6 +24,7 @@ export default function IssueReturnHeader({
         </p>
       </div>
 
+      {showQuickActions && (
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenQuickIssue}
@@ -38,6 +42,7 @@ export default function IssueReturnHeader({
           คืนอุปกรณ์
         </button>
       </div>
+      )}
     </div>
   );
 }

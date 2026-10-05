@@ -552,7 +552,7 @@ export default function AppShell({ user }: { user: SessionUser }) {
   useEffect(() => {
     const loadUnread = async () => {
       try {
-        const res = await fetch(`/api/notifications?role=${role}&unread=true`);
+        const res = await fetch("/api/notifications?unread=true");
         if (!res.ok) throw new Error("fail");
         const data = (await res.json()) as NotificationItem[];
         setUnread(data.length);
@@ -611,7 +611,7 @@ export default function AppShell({ user }: { user: SessionUser }) {
 
   const openNotifications = async () => {
     try {
-      const res = await fetch(`/api/notifications?role=${role}`);
+      const res = await fetch("/api/notifications");
       if (res.ok) {
         const data = (await res.json()) as NotificationItem[];
         setNotifList(data);
@@ -621,7 +621,7 @@ export default function AppShell({ user }: { user: SessionUser }) {
         await fetch("/api/notifications/mark-read", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role }),
+          body: JSON.stringify({}),
         });
         setNotifList((prev) =>
           prev.map((n) => ({
@@ -647,7 +647,7 @@ export default function AppShell({ user }: { user: SessionUser }) {
 
     try {
       const res = await fetch(
-        `/api/notifications?role=${role}&id=${encodeURIComponent(id)}`,
+        `/api/notifications?id=${encodeURIComponent(id)}`,
         { method: "DELETE" }
       );
       if (!res.ok) throw new Error("delete notification failed");
@@ -669,7 +669,7 @@ export default function AppShell({ user }: { user: SessionUser }) {
     setUnread(0);
 
     try {
-      const res = await fetch(`/api/notifications?role=${role}`, {
+      const res = await fetch("/api/notifications", {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("clear notifications failed");

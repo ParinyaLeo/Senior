@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adjustStock, listStockItems, upsertStockItems } from "@/lib/db";
 import type { StockRowDb } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 type StockApiRow = {
   id: string;
@@ -42,12 +43,16 @@ function mapFromDb(row: StockRowDb): StockApiRow {
 }
 
 export async function GET() {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
   const rows = await listStockItems();
   return NextResponse.json(rows.map(mapFromDb));
 }
 
 // Full stock sync from the management page (add / edit / delete items)
 export async function PUT(req: NextRequest) {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const body = await req.json().catch(() => null);
   if (!Array.isArray(body?.items)) {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });
@@ -73,6 +78,15 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "ข้อความมีอักขระที่ไม่รองรับ กรุณาลบแล้วลองใหม่" }, { status: 400 });
   }
 
+  // PUT เป็นการ sync ทั้งตาราง แถวที่ไม่อยู่ใน payload จะถูกลบ — การลบอุปกรณ์ทำได้เฉพาะผู้จัดการ (ตามปุ่มลบในหน้าสต็อก)
+  if (auth.user.role !== "Manager") {
+    const keep = new Set(items.map((it) => it.id));
+    const existing = await listStockItems();
+    if (existing.some((row) => !keep.has(row.id))) {
+      return NextResponse.json({ error: "ไม่มีสิทธิ์ลบอุปกรณ์ออกจากสต็อก" }, { status: 403 });
+    }
+  }
+
   try {
     await upsertStockItems(items);
   } catch (err) {
@@ -89,6 +103,9 @@ export async function PUT(req: NextRequest) {
 
 // Atomic stock adjustment triggered by event approve / issue / return / damage
 export async function PATCH(req: NextRequest) {
+  // เรียกจากการอนุมัติ/แก้ไขอุปกรณ์ของอีเวนต์ (จองและคืนสต็อก) ซึ่งเป็นหน้าที่ของผู้จัดการ
+  const auth = await requireUser("Manager");
+  if ("response" in auth) return auth.response;
   const body = await req.json().catch(() => null);
   const action = body?.action as string | undefined;
   if (!["deduct", "return", "damage"].includes(action ?? "")) {

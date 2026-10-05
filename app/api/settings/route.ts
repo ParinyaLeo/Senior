@@ -4,13 +4,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings, upsertSettings } from "@/lib/db";
 import { DEFAULT_SETTINGS } from "@/components/features/settings/constants";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 export async function GET() {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const data = await getSettings();
   return NextResponse.json(data ?? DEFAULT_SETTINGS);
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = await requireUser("Manager");
+  if ("response" in auth) return auth.response;
   const body = await req.json().catch(() => null);
   if (!body?.company || !body?.banking) {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });

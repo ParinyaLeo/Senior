@@ -148,7 +148,6 @@ export default function StockPage({
       <ReceiveStockModal
         open={receiveStockOpen}
         items={stockData}
-        role={role}
         onClose={() => setReceiveStockOpen(false)}
         onReceived={onStockReload}
       />

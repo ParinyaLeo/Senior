@@ -3,9 +3,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listStockReceiptsByStockId, receiveStock } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 // ดึงประวัติการรับเข้าสต็อกของอุปกรณ์ตัวเดียว ใช้แสดงใน StockDetailModal
 export async function GET(req: NextRequest) {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const equipmentId = req.nextUrl.searchParams.get("equipmentId");
   if (!equipmentId) {
     return NextResponse.json({ error: "equipmentId is required" }, { status: 400 });
@@ -36,6 +39,8 @@ export async function GET(req: NextRequest) {
 
 // รับเข้าสต็อก: คำนวณต้นทุนเฉลี่ยใหม่และบันทึกประวัติการรับเข้า (stock_receipts) แบบ atomic
 export async function POST(req: NextRequest) {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const body = await req.json().catch(() => null);
 
   const equipmentId = body?.equipmentId;
@@ -45,14 +50,14 @@ export async function POST(req: NextRequest) {
   const otherCost = body?.otherCost;
   const supplier = body?.supplier;
   const poNumber = body?.poNumber;
-  const role = body?.role;
+  // บันทึกผู้รับเข้าเป็น role ของ session (เดิมรับ body.role จาก client ซึ่งปลอมได้)
+  const role = auth.user.role;
 
   const valid =
     typeof equipmentId === "string" && equipmentId.trim().length > 0 &&
     typeof quantity === "number" && Number.isInteger(quantity) && quantity > 0 &&
     typeof unitCost === "number" && unitCost > 0 &&
     typeof supplier === "string" && supplier.trim().length > 0 &&
-    typeof role === "string" && role.trim().length > 0 &&
     (poNumber === undefined || poNumber === null || typeof poNumber === "string") &&
     (shippingCost === undefined || shippingCost === null || (typeof shippingCost === "number" && shippingCost >= 0)) &&
     (otherCost === undefined || otherCost === null || (typeof otherCost === "number" && otherCost >= 0));

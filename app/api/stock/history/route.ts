@@ -2,8 +2,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { listStockHistory } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const limitParam = req.nextUrl.searchParams.get("limit");
   const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 100), 500) : 100;
   const rows = await listStockHistory(limit);

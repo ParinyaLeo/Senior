@@ -3,12 +3,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertEquipmentHistory, listEquipmentHistoryByEvent } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 // ─── GET: ดึงประวัติการแก้ไขอุปกรณ์ของ Event ─────────────────────────────
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser("Manager");
+  if ("response" in auth) return auth.response;
   const { id } = await context.params;
   const rows = await listEquipmentHistoryByEvent(id);
   return NextResponse.json(rows);
@@ -19,6 +22,8 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser("Manager");
+  if ("response" in auth) return auth.response;
   const { id } = await context.params;
   const body = await req.json().catch(() => null);
 

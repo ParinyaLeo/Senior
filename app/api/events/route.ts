@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { EventRow } from "@/lib/db";
 import { allocateEventId, insertEvent, listEvents } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 function mapEvent(row: EventRow) {
   return {
@@ -47,22 +48,22 @@ function mapEvent(row: EventRow) {
   };
 }
 
-function canReturnEventForRole(row: EventRow, role: string | null) {
-  if (role !== "Stockkeeper") return true;
-
-  return row.status_tone === "success" || row.status_tone === "progress";
-}
-
-export async function GET(req: NextRequest) {
-  const role = req.nextUrl.searchParams.get("role");
+// เลิกรับ ?role= แล้ว: เดิมใช้กรองรายการสำหรับเจ้าหน้าที่คลังเฉพาะหน้าอีเวนต์ แต่หน้ารายงาน/เบิกคืนเรียกโดยไม่ส่ง role
+// จึงได้ทุกอีเวนต์อยู่แล้ว (ไม่ใช่การกันสิทธิ์) — การกรองตาม role ของหน้าอีเวนต์ทำฝั่ง client ใน canShowEventForRole
+export async function GET() {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
   const rows = await listEvents();
-  return NextResponse.json(rows.filter((row) => canReturnEventForRole(row, role)).map(mapEvent));
+  return NextResponse.json(rows.map(mapEvent));
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TAX_ID_PATTERN = /^\d{13}$/;
 
 export async function POST(req: NextRequest) {
+  // สร้างอีเวนต์ได้เฉพาะลูกค้า (ปุ่ม "สร้างอีเวนต์ใหม่" มีเฉพาะ role SA)
+  const auth = await requireUser("SA");
+  if ("response" in auth) return auth.response;
   const body = await req.json().catch(() => null);
   if (!body?.title || !body?.company || !body?.place || !body?.startDate || !body?.endDate) {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });

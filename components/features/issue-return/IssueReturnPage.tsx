@@ -529,7 +529,7 @@ export default function IssueReturnPage({
       />
 
       <div className="px-6 py-8">
-        <IssueReturnHeader onOpenQuickIssue={() => setIsQuickIssueOpen(true)} onOpenQuickReturn={() => setIsQuickReturnOpen(true)} />
+        <IssueReturnHeader showQuickActions={role === "Stockkeeper"} onOpenQuickIssue={() => setIsQuickIssueOpen(true)} onOpenQuickReturn={() => setIsQuickReturnOpen(true)} />
         <IssueReturnStats stats={stats} />
         <IssueReturnTabs tab={tab} issueCount={issueList.length} inUseCount={inUseList.length} returnCount={returnList.length} onChange={setTab} />
         <IssueReturnEventList

@@ -2,9 +2,12 @@
 
 import { NextResponse } from "next/server";
 import { listReportedRepairLots } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 
 // ดึงล็อตที่กำลังซ่อม (damage_items ที่ status = 'reported') ทั้งหมด แยกเป็นรายการต่อ record — ใช้ในหน้าจำหน่ายสต็อก
 export async function GET() {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const rows = await listReportedRepairLots();
   return NextResponse.json(
     rows.map((r) => ({

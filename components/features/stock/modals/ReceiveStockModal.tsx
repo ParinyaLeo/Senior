@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, Minus, Plus, Search, X } from "lucide-react";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
-import type { Role, StockRow } from "../types";
+import type { StockRow } from "../types";
 import { fmt } from "../helpers";
 import StockField from "../components/StockField";
 import StockPill from "../components/StockPill";
@@ -11,7 +11,6 @@ import StockPill from "../components/StockPill";
 type Props = {
   open: boolean;
   items: StockRow[];
-  role: Role;
   onClose: () => void;
   onReceived: () => Promise<void>;
 };
@@ -78,7 +77,6 @@ function findSimilarSupplier(name: string, list: string[]): string | null {
 export default function ReceiveStockModal({
   open,
   items,
-  role,
   onClose,
   onReceived,
 }: Props) {
@@ -236,7 +234,6 @@ export default function ReceiveStockModal({
           otherCost: other || undefined,
           supplier,
           poNumber: poNumber.trim() || undefined,
-          role,
         }),
       });
 

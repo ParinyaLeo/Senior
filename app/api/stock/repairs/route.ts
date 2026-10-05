@@ -3,9 +3,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listRepairingHistoryByStockId, resolveRepairingStock } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 // ดึงประวัติการแจ้งซ่อมของอุปกรณ์ตัวเดียว ใช้แสดงใน StockDetailModal
 export async function GET(req: NextRequest) {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const equipmentId = req.nextUrl.searchParams.get("equipmentId");
   if (!equipmentId) {
     return NextResponse.json({ error: "equipmentId is required" }, { status: 400 });
@@ -27,6 +30,8 @@ export async function GET(req: NextRequest) {
 
 // คืน (ซ่อมเสร็จ กลับเป็นพร้อมใช้) หรือจำหน่ายทิ้งถาวร (ซ่อมไม่ได้) จากล็อตที่ระบุใน damage_items โดยตรง
 export async function POST(req: NextRequest) {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const body = await req.json().catch(() => null);
 
   const damageItemId = body?.damageItemId;

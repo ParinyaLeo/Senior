@@ -17,6 +17,7 @@ import {
 } from "@/lib/db";
 import type { EventEquipmentRow, StockRowDb, StockShortage, WorkOrderSalesTargets } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 function mapStockForResponse(rows: StockRowDb[]) {
   return rows.map((r) => ({
@@ -59,11 +60,6 @@ function isEventDeleteBlockedError(err: unknown) {
 // (ไม่เก็บ base64 ก้อนใหญ่ใน DB เพราะ data URI ที่ยาวเกิน ~2MB เปิดในแท็บใหม่ไม่ได้บนเบราว์เซอร์ตระกูล Chromium)
 async function handleUploadReceiptForm(req: NextRequest, id: string) {
   const formData = await req.formData();
-  const role = formData.get("role");
-
-  if (role !== "SA") {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
 
   const current = await getEventById(id);
   if (!current) {
@@ -226,6 +222,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   const contentType = req.headers.get("content-type") ?? "";
   if (contentType.includes("multipart/form-data")) {
+    // แนบสลิปการชำระเงิน: เฉพาะลูกค้า (เดิมเช็คจาก formData role ที่ client ส่งมา)
+    const auth = await requireUser("SA");
+    if ("response" in auth) return auth.response;
     return handleUploadReceiptForm(req, id);
   }
 
@@ -236,6 +235,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   }
 
   if (body?.workOrderSalesTargets !== undefined) {
+    // บันทึกเป้าหมายยอดขายในใบสั่งงาน (หน้ารายงาน ซึ่งเปิดได้ทั้งผู้จัดการและเจ้าหน้าที่คลัง)
+    const auth = await requireUser("Manager", "Stockkeeper");
+    if ("response" in auth) return auth.response;
     if (!isValidWorkOrderSalesTargets(body.workOrderSalesTargets)) {
       return NextResponse.json({ error: "invalid workOrderSalesTargets" }, { status: 400 });
     }
@@ -262,6 +264,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   // อัปเดต equipment ของ Event + ปรับสต็อกจริง ในธุรกรรมเดียวกันที่ backend (กันปัญหา
   // Event บอกว่าเบิก/คืนแล้วแต่ตัวเลขสต็อกไม่ตรงตาม ถ้าเรียกเป็น 2 endpoint แยกแล้วอันใดอันหนึ่งพลาด)
   if (body?.quickEquipmentAction) {
+    // เบิก/คืนด่วน: เฉพาะเจ้าหน้าที่คลัง
+    const auth = await requireUser("Stockkeeper");
+    if ("response" in auth) return auth.response;
     if (!["add", "remove"].includes(body.quickEquipmentAction)) {
       return NextResponse.json({ error: "invalid quickEquipmentAction" }, { status: 400 });
     }
@@ -315,6 +320,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   // ─── ยืนยันการชำระเงิน (อัปโหลดสลิปแยกไปที่ multipart branch ด้านบนแล้ว) ─────
   if (body?.paymentAction) {
+    // ยืนยันการชำระเงิน: เฉพาะผู้จัดการ (เดิมเช็คจาก body.role ที่ client ส่งมา)
+    const auth = await requireUser("Manager");
+    if ("response" in auth) return auth.response;
     if (body.paymentAction !== "confirmPayment") {
       return NextResponse.json({ error: "invalid paymentAction" }, { status: 400 });
     }
@@ -322,10 +330,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const current = await getEventById(id);
     if (!current) {
       return NextResponse.json({ error: "event not found" }, { status: 404 });
-    }
-
-    if (body.role !== "Manager") {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
     if (!current.receipt_data_url && !current.receipt_file_path) {
@@ -345,6 +349,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
   // ─── อัปเดต issueStatus (inuse / returned / ready) ─────────────────────────
   if (body?.issueStatus) {
+    // ยืนยันเบิก/คืนจากการ์ดอีเวนต์: เฉพาะเจ้าหน้าที่คลัง
+    const auth = await requireUser("Stockkeeper");
+    if ("response" in auth) return auth.response;
     if (!["ready", "inuse", "returned"].includes(body.issueStatus)) {
       return NextResponse.json({ error: "invalid issueStatus" }, { status: 400 });
     }
@@ -382,6 +389,8 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   }
 
   // ─── อนุมัติ / ไม่อนุมัติ Event (ต้องมี startDate, endDate, equipment) ─────────
+  const decisionAuth = await requireUser("Manager");
+  if ("response" in decisionAuth) return decisionAuth.response;
   if (!body?.startDate || !body?.endDate || !Array.isArray(body?.equipment) || !body?.decision) {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });
   }
@@ -433,7 +442,18 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 }
 
 export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  // ลบอีเวนต์: เฉพาะลูกค้า และเฉพาะอีเวนต์ที่ยังรออนุมัติ (ตรงกับเงื่อนไขปุ่มลบใน EventListCard)
+  // ผู้จัดการไม่อนุมัติ = ลบผ่าน PATCH decision ด้านบน ไม่ได้ใช้ endpoint นี้
+  const auth = await requireUser("SA");
+  if ("response" in auth) return auth.response;
   const { id } = await context.params;
+  const current = await getEventById(id);
+  if (!current) {
+    return NextResponse.json({ error: "event not found" }, { status: 404 });
+  }
+  if (current.status_text !== "รออนุมัติ" || current.issue_status === "inuse") {
+    return NextResponse.json({ error: "ลบได้เฉพาะอีเวนต์ที่ยังรออนุมัติ" }, { status: 403 });
+  }
   try {
     const rowCount = await deleteEventById(id);
     if (rowCount === 0) {

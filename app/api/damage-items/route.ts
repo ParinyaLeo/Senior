@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { insertDamageItems, listDamageItems } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
+import { requireUser } from "@/lib/auth";
 
 const MAX_PHOTO_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_PHOTO_MIME_TYPES = ["image/jpeg", "image/png"];
@@ -12,6 +13,8 @@ const DAMAGE_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "damage"
 
 // ดึง breakdown ความเสียหายรายชิ้นทั้งหมด ใช้แสดงในหน้ารายงาน > ความเสียหาย
 export async function GET() {
+  const auth = await requireUser("Manager", "Stockkeeper");
+  if ("response" in auth) return auth.response;
   const rows = await listDamageItems();
   return NextResponse.json(
     rows.map((r) => ({
@@ -35,6 +38,8 @@ export async function GET() {
 // รับเป็น multipart/form-data เพื่อแนบรูปหลักฐานความเสียหายไปด้วย แล้วเขียนไฟล์ลงดิสก์
 // (pattern เดียวกับ handleUploadReceiptForm ใน app/api/events/[id]/route.ts)
 export async function POST(req: NextRequest) {
+  const auth = await requireUser("Stockkeeper");
+  if ("response" in auth) return auth.response;
   const formData = await req.formData().catch(() => null);
   if (!formData) {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });
