@@ -811,6 +811,21 @@ export async function getEventById(id: string): Promise<EventRow | null> {
   }
 }
 
+// หาอีเวนต์ที่สลิปไฟล์นี้ผูกอยู่ ใช้เช็คว่าลูกค้าที่ขอเปิดไฟล์เป็นเจ้าของอีเวนต์หรือไม่
+export async function getEventByReceiptPath(receiptPath: string): Promise<{ id: string; created_by: string | null } | null> {
+  const client = await pool.connect();
+  try {
+    await ensureEventsTable(client);
+    const res = await client.query<{ id: string; created_by: string | null }>(
+      `SELECT id, created_by FROM events WHERE receipt_file_path = $1 LIMIT 1`,
+      [receiptPath]
+    );
+    return res.rows[0] ?? null;
+  } finally {
+    client.release();
+  }
+}
+
 // เพิ่ม Event ใหม่จากฟอร์มสร้างงาน โดยเริ่ม issue_status เป็น ready
 // ขอเลข Event ถัดไป (EVT001, EVT002, ...) จาก sequence — atomic กันสร้างพร้อมกันได้เลขซ้ำ และไม่ย้อนกลับเมื่อลบ Event
 export async function allocateEventId(): Promise<string> {

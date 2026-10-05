@@ -6,10 +6,12 @@ import path from "path";
 import { insertDamageItems, listDamageItems } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
 import { requireUser } from "@/lib/auth";
+import { extensionForMime, uploadDir, uploadUrl } from "@/lib/uploads";
 
 const MAX_PHOTO_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_PHOTO_MIME_TYPES = ["image/jpeg", "image/png"];
-const DAMAGE_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "damage");
+// เก็บนอก public/ — เสิร์ฟผ่าน app/uploads/[kind]/[name]/route.ts ที่เช็คสิทธิ์
+const DAMAGE_UPLOAD_DIR = uploadDir("damage");
 
 // ดึง breakdown ความเสียหายรายชิ้นทั้งหมด ใช้แสดงในหน้ารายงาน > ความเสียหาย
 export async function GET() {
@@ -111,11 +113,12 @@ export async function POST(req: NextRequest) {
     const paths: string[] = [];
     for (let i = 0; i < count; i++) {
       const file = photoFiles[cursor++];
-      const storedFileName = `${eventId}-${globalIndex}-${Date.now()}${path.extname(file.name)}`;
+      // นามสกุลจาก MIME ที่ตรวจแล้วด้านบน ไม่ใช้นามสกุลจากชื่อไฟล์ที่ผู้ใช้ส่งมา
+      const storedFileName = `${eventId}-${globalIndex}-${Date.now()}${extensionForMime(file.type)}`;
       globalIndex++;
       const buffer = Buffer.from(await file.arrayBuffer());
       await writeFile(path.join(DAMAGE_UPLOAD_DIR, storedFileName), buffer);
-      paths.push(`/uploads/damage/${storedFileName}`);
+      paths.push(uploadUrl("damage", storedFileName));
     }
     photoPathsByItem.push(paths);
   }

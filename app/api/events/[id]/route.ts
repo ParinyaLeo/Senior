@@ -19,6 +19,7 @@ import {
 import type { EventEquipmentRow, StockRowDb, StockShortage, WorkOrderSalesTargets } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
 import { requireUser } from "@/lib/auth";
+import { extensionForMime, uploadDir, uploadUrl } from "@/lib/uploads";
 
 function mapStockForResponse(rows: StockRowDb[]) {
   return rows.map((r) => ({
@@ -47,7 +48,8 @@ function normalizeItemList(value: unknown): Array<{ name: string; qty: number }>
 const MAX_IMAGE_RECEIPT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_PDF_RECEIPT_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_RECEIPT_MIME_TYPES = ["image/jpeg", "image/png", "application/pdf"];
-const RECEIPT_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "receipts");
+// เก็บนอก public/ — เสิร์ฟผ่าน app/uploads/[kind]/[name]/route.ts ที่เช็คสิทธิ์
+const RECEIPT_UPLOAD_DIR = uploadDir("receipts");
 const EVENT_DELETE_BLOCKED_ERROR =
   "ลบอีเวนต์นี้ไม่ได้ เพราะมีประวัติความเสียหายผูกอยู่ กรุณาจัดการเคสความเสียหายให้เสร็จก่อน";
 
@@ -89,11 +91,12 @@ async function handleUploadReceiptForm(req: NextRequest, id: string, userId: str
 
   await mkdir(RECEIPT_UPLOAD_DIR, { recursive: true });
 
-  const storedFileName = `${id}-${Date.now()}${path.extname(file.name)}`;
+  // นามสกุลจาก MIME ที่ตรวจแล้วด้านบน ไม่ใช้นามสกุลจากชื่อไฟล์ที่ผู้ใช้ส่งมา
+  const storedFileName = `${id}-${Date.now()}${extensionForMime(file.type)}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(RECEIPT_UPLOAD_DIR, storedFileName), buffer);
 
-  const filePath = `/uploads/receipts/${storedFileName}`;
+  const filePath = uploadUrl("receipts", storedFileName);
   const uploadedAt = new Date().toISOString();
 
   const rowCount = await updateEventPaymentReceipt({

@@ -48,3 +48,6 @@ next-env.d.ts
 
 # screenshots
 /screenshots/
+
+# user uploads (เก็บนอก public/ เสิร์ฟผ่าน app/uploads/[kind]/[name])
+/storage/
