@@ -1,5 +1,9 @@
+import { redirect } from "next/navigation";
 import AppShell from "../components/AppShell";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function Page() {
-  return <AppShell />;
+export default async function Page() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return <AppShell user={user} />;
 }

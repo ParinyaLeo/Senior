@@ -8,10 +8,11 @@ import {
   BarChart3,
   Settings,
   Bell,
-  ChevronDown,
+  LogOut,
   X,
 } from "lucide-react";
 
+import type { SessionUser } from "@/lib/auth";
 import EventsPage from "./features/events/EventsPage";
 import Stock from "./pages/Stock";
 import IssueReturn from "./pages/IssueReturn";
@@ -359,16 +360,16 @@ function RoleBadge({ role }: { role: Role }) {
   );
 }
 
-export default function AppShell() {
-  const [role, setRole] = useState<Role>("Manager");
+// role มาจาก session ฝั่ง server (app/page.tsx) — เปลี่ยน role ได้ทางเดียวคือ logout แล้ว login บัญชีอื่น
+export default function AppShell({ user }: { user: SessionUser }) {
+  const role: Role = user.role;
   const tabs = useMemo(() => tabsByRole[role], [role]);
   const [tab, setTab] = useState<Tab>("events");
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifList, setNotifList] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
   const notifRef = React.useRef<HTMLDivElement | null>(null);
-  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-  const roleDropdownRef = React.useRef<HTMLDivElement | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const [stockData, setStockData] = useState<StockRow[]>(initialStock);
   const [stockSaveError, setStockSaveError] = useState<string | null>(null);
@@ -597,22 +598,16 @@ export default function AppShell() {
     };
   }, [notifOpen]);
 
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (!roleDropdownOpen) return;
-      if (!roleDropdownRef.current) return;
-      if (!roleDropdownRef.current.contains(e.target as Node)) setRoleDropdownOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setRoleDropdownOpen(false);
-    };
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [roleDropdownOpen]);
+  const logout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      // ไปหน้า login เสมอ แม้ request ล้ม (cookie หมดอายุเอง/ถูกลบไปแล้ว ก็ต้อง login ใหม่อยู่ดี)
+      window.location.assign("/login");
+    }
+  };
 
   const openNotifications = async () => {
     try {
@@ -743,69 +738,19 @@ export default function AppShell() {
               </div>
             )}
 
-            {/* Role switcher — colored badge with dropdown */}
-            <div className="relative" ref={roleDropdownRef}>
-              <button
-                onClick={() => setRoleDropdownOpen((v) => !v)}
-                className={[
-                  "flex h-10 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold shadow-sm transition-colors",
-                  role === "SA"
-                    ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    : role === "Manager"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                    : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
-                ].join(" ")}
-              >
-                <span className="h-2 w-2 rounded-full bg-current opacity-70" />
-                <span>{getRoleLabel(role)}</span>
-                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
-              </button>
-
-              {roleDropdownOpen && (
-                <div className="absolute right-0 top-[calc(100%+8px)] z-[200] w-52 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl">
-                  <div className="px-3 py-2 text-xs font-semibold text-zinc-500">
-                    สลับบทบาท
-                  </div>
-                  {(["SA", "Manager", "Stockkeeper"] as Role[]).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => {
-                        setRole(r);
-                        setRoleDropdownOpen(false);
-                      }}
-                      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-zinc-50 ${
-                        role === r ? "bg-zinc-50 font-semibold" : ""
-                      }`}
-                    >
-                      <div
-                        className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${
-                          r === "SA"
-                            ? "bg-blue-600"
-                            : r === "Manager"
-                            ? "bg-emerald-600"
-                            : "bg-violet-600"
-                        }`}
-                      >
-                        {getRoleShort(r)}
-                      </div>
-                      <span
-                        className={
-                          r === "SA"
-                            ? "text-blue-700"
-                            : r === "Manager"
-                            ? "text-emerald-700"
-                            : "text-violet-700"
-                        }
-                      >
-                        {getRoleLabel(r)}
-                      </span>
-                      {role === r && (
-                        <span className="ml-auto h-2 w-2 rounded-full bg-current opacity-70" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+            {/* Role ของบัญชีที่ login อยู่ (แสดงอย่างเดียว ไม่สลับได้) */}
+            <div
+              className={[
+                "flex h-10 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold shadow-sm",
+                role === "SA"
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  : role === "Manager"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-violet-200 bg-violet-50 text-violet-700",
+              ].join(" ")}
+            >
+              <span className="h-2 w-2 rounded-full bg-current opacity-70" />
+              <span>{getRoleLabel(role)}</span>
             </div>
 
             {/* Notification bell */}
@@ -884,17 +829,27 @@ export default function AppShell() {
               )}
             </div>
 
-            {/* User card */}
-            <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2 shadow-sm">
+            {/* User card + logout */}
+            <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white py-2 pl-3 pr-2 shadow-sm">
               <div className="grid h-8 w-8 place-items-center rounded-full bg-zinc-100 text-sm font-bold text-zinc-700">
-                {getRoleShort(role)}
+                {user.displayName.trim().charAt(0).toUpperCase() || getRoleShort(role)}
               </div>
-              <div className="hidden leading-tight md:block">
-                <div className="text-sm font-semibold text-zinc-900">
-                  ทีม{getRoleLabel(role)}
+              <div className="hidden max-w-[160px] leading-tight md:block">
+                <div className="truncate text-sm font-semibold text-zinc-900">
+                  {user.displayName}
                 </div>
-                <div className="text-xs text-zinc-500">{getRoleLabel(role)}</div>
+                <div className="truncate text-xs text-zinc-500">{user.email}</div>
               </div>
+              <button
+                type="button"
+                onClick={logout}
+                disabled={loggingOut}
+                title="ออกจากระบบ"
+                aria-label="ออกจากระบบ"
+                className="grid h-8 w-8 place-items-center rounded-xl text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-50"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
