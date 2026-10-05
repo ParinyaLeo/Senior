@@ -2,19 +2,34 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, LogIn } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, LogIn } from "lucide-react";
+import type { AuthRole } from "@/lib/authSchema";
 import AuthCard, { AuthField, authInputClass } from "./AuthCard";
+import RoleSelect, { roleLabel } from "./RoleSelect";
+
+// เวลาที่แสดงคำเตือน "บทบาทไม่ตรง" ก่อนพาเข้าแอป
+const ROLE_MISMATCH_REDIRECT_MS = 2500;
+
+const EMAIL_PLACEHOLDER: Record<AuthRole | "none", string> = {
+  none: "name@example.com",
+  SA: "อีเมลที่ใช้สมัครสมาชิก",
+  Manager: "อีเมลบัญชีพนักงาน",
+  Stockkeeper: "อีเมลบัญชีพนักงาน",
+};
 
 export default function LoginForm() {
+  // บทบาทที่เลือกเป็นแค่ตัวช่วย (ปรับข้อความ/ลิงก์) — สิทธิ์จริงมาจากบัญชีที่ login เสมอ
+  const [selectedRole, setSelectedRole] = useState<AuthRole | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [mismatch, setMismatch] = useState<AuthRole | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || mismatch) return;
     setSubmitting(true);
     setError("");
     try {
@@ -23,40 +38,55 @@ export default function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         setError(data?.error || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
+        setSubmitting(false);
+        return;
+      }
+      const actualRole = data?.user?.role as AuthRole | undefined;
+      if (selectedRole && actualRole && actualRole !== selectedRole) {
+        // login สำเร็จแล้ว แต่บัญชีไม่ใช่บทบาทที่เลือก → แจ้งสั้นๆ แล้วเข้าตาม role จริงของบัญชี
+        setMismatch(actualRole);
+        setTimeout(() => window.location.assign("/"), ROLE_MISMATCH_REDIRECT_MS);
         return;
       }
       window.location.assign("/");
     } catch {
       setError("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่");
-    } finally {
       setSubmitting(false);
     }
   };
 
+  const isStaff = selectedRole === "Manager" || selectedRole === "Stockkeeper";
+
   return (
     <AuthCard
       title="เข้าสู่ระบบ"
-      subtitle="กรอกอีเมลและรหัสผ่านของคุณ"
+      subtitle="เลือกบทบาท แล้วกรอกอีเมลและรหัสผ่านของบัญชีคุณ"
       footer={
-        <>
-          ยังไม่มีบัญชีลูกค้า?{" "}
-          <Link href="/register" className="font-semibold text-red-600 hover:text-red-700">
-            สมัครสมาชิก
-          </Link>
-        </>
+        isStaff ? (
+          <span className="text-zinc-500">บัญชีพนักงานสร้างโดยผู้ดูแลระบบ หากเข้าใช้งานไม่ได้กรุณาติดต่อผู้จัดการ</span>
+        ) : (
+          <>
+            ยังไม่มีบัญชีลูกค้า?{" "}
+            <Link href="/register" className="font-semibold text-red-600 hover:text-red-700">
+              สมัครสมาชิก
+            </Link>
+          </>
+        )
       }
     >
       <form onSubmit={submit} noValidate>
+        <RoleSelect value={selectedRole} onChange={setSelectedRole} />
+
         <AuthField label="อีเมล">
           <input
             type="email"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@example.com"
+            placeholder={EMAIL_PLACEHOLDER[selectedRole ?? "none"]}
             className={authInputClass}
           />
         </AuthField>
@@ -82,7 +112,21 @@ export default function LoginForm() {
           </div>
         </AuthField>
 
-        {error && <p className="mb-4 text-sm font-medium text-red-600">{error}</p>}
+        {error && (
+          <p role="alert" className="mb-4 text-sm font-medium text-red-600">
+            {error}
+          </p>
+        )}
+
+        {mismatch && selectedRole && (
+          <div role="status" className="mb-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              บัญชีนี้ไม่ใช่บทบาทที่เลือกไว้ ({roleLabel(selectedRole)}) — กำลังเข้าสู่ระบบในฐานะ{" "}
+              <span className="font-semibold">{roleLabel(mismatch)}</span>
+            </span>
+          </div>
+        )}
 
         <button
           type="submit"
@@ -90,7 +134,7 @@ export default function LoginForm() {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <LogIn className="h-4 w-4" />
-          {submitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+          {mismatch ? "กำลังเข้าสู่ระบบ..." : submitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
         </button>
       </form>
     </AuthCard>

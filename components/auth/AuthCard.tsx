@@ -25,7 +25,7 @@ export default function AuthCard({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="mb-1 text-lg font-semibold text-zinc-900">{title}</h1>
           <p className="mb-6 text-sm text-zinc-500">{subtitle}</p>
           {children}
