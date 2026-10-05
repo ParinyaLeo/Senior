@@ -51,3 +51,7 @@ next-env.d.ts
 
 # user uploads (เก็บนอก public/ เสิร์ฟผ่าน app/uploads/[kind]/[name])
 /storage/
+
+# Playwright e2e (npm run test:e2e)
+/e2e-report/
+/test-results/

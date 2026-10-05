@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "seed:users": "node --env-file=.env --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-users.mjs",
-    "migrate:uploads": "node --env-file=.env --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/move-uploads.mjs"
+    "migrate:uploads": "node --env-file=.env --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/move-uploads.mjs",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:report": "playwright show-report e2e-report/html"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
@@ -21,6 +23,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
