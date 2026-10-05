@@ -92,21 +92,17 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "ไม่มีสิทธิ์ลบอุปกรณ์ออกจากสต็อก" }, { status: 403 });
   }
 
-  // รหัสอุปกรณ์ใหม่สร้างจากรายการในเครื่องผู้ใช้ — ถ้ามีคนเพิ่มรหัสเดียวกันไปก่อน ต้องไม่ทับของเขา
-  if (createdIds.length > 0) {
-    const existingIds = new Set((await listStockItems()).map((row) => row.id));
-    const taken = createdIds.filter((id) => existingIds.has(id));
-    if (taken.length > 0) {
+  try {
+    await upsertStockItems(items, deletedIds, createdIds);
+  } catch (err) {
+    // รหัสอุปกรณ์ใหม่สร้างจากรายการในเครื่องผู้ใช้ — ถ้ามีคนเพิ่มรหัสเดียวกันไปก่อน ต้องไม่ทับของเขา (เช็คแบบ atomic ใน DB)
+    if (err && typeof err === "object" && "code" in err && err.code === "STOCK_ID_TAKEN") {
+      const takenId = "takenId" in err ? String(err.takenId) : "";
       return NextResponse.json(
-        { error: `รหัสอุปกรณ์ ${taken.join(", ")} ถูกใช้ไปแล้ว (อาจมีผู้ใช้อื่นเพิ่มพร้อมกัน) กรุณารีเฟรชหน้าแล้วลองใหม่` },
+        { error: `รหัสอุปกรณ์ ${takenId} ถูกใช้ไปแล้ว (อาจมีผู้ใช้อื่นเพิ่มพร้อมกัน) กรุณารีเฟรชหน้าแล้วลองใหม่` },
         { status: 409 }
       );
     }
-  }
-
-  try {
-    await upsertStockItems(items, deletedIds);
-  } catch (err) {
     if (err && typeof err === "object" && "code" in err && (err.code === "23001" || err.code === "23503")) {
       return NextResponse.json(
         { error: "ไม่สามารถลบอุปกรณ์นี้ออกจากสต็อกได้ เพราะมีประวัติการรับเข้า/ประวัติการเปลี่ยนแปลงผูกอยู่" },

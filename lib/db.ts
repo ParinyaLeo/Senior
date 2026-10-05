@@ -9,7 +9,7 @@ const connectionString =
   "postgres://postgres:postgres@localhost:5432/postgres";
 
 // สร้าง connection pool กลางสำหรับ query PostgreSQL ทั้งระบบ
-const pool = new Pool({
+const poolOptions = {
   connectionString,
   ssl:
     process.env.PGSSLMODE === "disable"
@@ -17,7 +17,12 @@ const pool = new Pool({
       : process.env.NODE_ENV === "production"
         ? { rejectUnauthorized: false }
         : false,
-});
+};
+const pool = new Pool(poolOptions);
+
+// connection แยกสำหรับสร้าง/อัปเดต schema (DDL) — ไม่แย่ง slot ของ pool หลัก
+// (ถ้าใช้ pool หลัก request ที่ถือ connection ไว้ครบทุกช่องแล้วรอ schema จะทำให้ DDL ไม่มี connection ใช้และค้าง)
+const schemaPool = new Pool({ ...poolOptions, max: 1 });
 
 // รูปแบบข้อมูล notification ที่อ่านจากตาราง notifications
 export type NotificationRow = {
@@ -221,7 +226,7 @@ async function addForeignKeyIfNotExists(
 }
 
 // ตรวจและสร้างตารางแจ้งเตือน ถ้ายังไม่มีในฐานข้อมูล
-async function ensureNotificationsTable(client?: PoolClient) {
+async function ensureNotificationsTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -245,10 +250,8 @@ async function ensureNotificationsTable(client?: PoolClient) {
   }
 }
 
-let authTablesReady: Promise<void> | null = null;
-
 // ตรวจและสร้างตาราง Event รวมถึงเติม column ใหม่ที่อาจเพิ่มภายหลัง
-async function ensureEventsTable(client?: PoolClient) {
+async function ensureEventsTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -337,12 +340,7 @@ async function ensureEventsTable(client?: PoolClient) {
       ADD COLUMN IF NOT EXISTS event_type TEXT;
     `);
     // เจ้าของอีเวนต์ — ตาราง users ต้องมีก่อนจึงจะผูก FK ได้
-    // เรียกครั้งเดียวต่อ process: DDL ของ users มี ALTER TABLE ที่ lock ตาราง ถ้ารันทุก request จะชนกับการอ่าน session จน deadlock
-    authTablesReady ??= ensureAuthTables(pool).catch((err) => {
-      authTablesReady = null;
-      throw err;
-    });
-    await authTablesReady;
+    await ensureAuthTables(c);
     await c.query(`
       ALTER TABLE events
       ADD COLUMN IF NOT EXISTS created_by TEXT;
@@ -378,7 +376,7 @@ async function ensureEventsTable(client?: PoolClient) {
 }
 
 // ตรวจและสร้างตาราง stock_items สำหรับเก็บข้อมูลอุปกรณ์ในคลัง
-async function ensureStockTable(client?: PoolClient) {
+async function ensureStockTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -412,7 +410,7 @@ async function ensureStockTable(client?: PoolClient) {
 }
 
 // ตรวจและสร้างตาราง stock_history สำหรับเก็บประวัติการเปลี่ยนจำนวนอุปกรณ์
-async function ensureStockHistoryTable(client?: PoolClient) {
+async function ensureStockHistoryTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -435,8 +433,8 @@ async function ensureStockHistoryTable(client?: PoolClient) {
     `);
 
     // ตารางแม่ต้องมีอยู่ก่อนถึงจะใส่ FK ได้ (เผื่อฟังก์ชันนี้ถูกเรียกเป็นจุดแรกสุด)
-    await ensureStockTable(c);
-    await ensureEventsTable(c);
+    await ensureStockTableDdl(c);
+    await ensureEventsTableDdl(c);
     // ลบ stock item ที่มีประวัติอยู่ไม่ได้ (ป้องกันเสียประวัติทางบัญชี) — ต้องจัดการประวัติก่อน
     await addForeignKeyIfNotExists(
       c,
@@ -459,7 +457,7 @@ async function ensureStockHistoryTable(client?: PoolClient) {
 }
 
 // ตรวจและสร้างตาราง stock_receipts สำหรับเก็บประวัติการรับเข้าสต็อก
-async function ensureStockReceiptsTable(client?: PoolClient) {
+async function ensureStockReceiptsTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -490,7 +488,7 @@ async function ensureStockReceiptsTable(client?: PoolClient) {
       ADD COLUMN IF NOT EXISTS other_cost NUMERIC NOT NULL DEFAULT 0;
     `);
 
-    await ensureStockTable(c);
+    await ensureStockTableDdl(c);
     // ลบ stock item ที่เคยรับเข้าสต็อกแล้วไม่ได้ (ป้องกันเสียประวัติต้นทุน/ผู้ขาย)
     await addForeignKeyIfNotExists(
       c,
@@ -505,7 +503,7 @@ async function ensureStockReceiptsTable(client?: PoolClient) {
 }
 
 // ตรวจและสร้างตาราง damage_items สำหรับเก็บ breakdown ความเสียหายรายชิ้นแบบถาวร (แทนที่ state ชั่วคราวใน client)
-async function ensureDamageItemsTable(client?: PoolClient) {
+async function ensureDamageItemsTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -546,7 +544,7 @@ async function ensureDamageItemsTable(client?: PoolClient) {
       WHERE billed_cost IS NULL;
     `);
 
-    await ensureEventsTable(c);
+    await ensureEventsTableDdl(c);
     // ลบอีเวนต์ที่มีประวัติความเสียหายผูกอยู่ไม่ได้ (ใช้ในรายงาน/เรียกเก็บเงิน ต้องจัดการเคสให้จบก่อน)
     await addForeignKeyIfNotExists(
       c,
@@ -561,7 +559,7 @@ async function ensureDamageItemsTable(client?: PoolClient) {
 }
 
 // ตรวจและสร้างตาราง equipment_history สำหรับประวัติการเพิ่ม/ลบอุปกรณ์ใน Event
-async function ensureEquipmentHistoryTable(client?: PoolClient) {
+async function ensureEquipmentHistoryTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -575,7 +573,7 @@ async function ensureEquipmentHistoryTable(client?: PoolClient) {
       );
     `);
 
-    await ensureEventsTable(c);
+    await ensureEventsTableDdl(c);
     // log ภายในของอีเวนต์นั้นล้วนๆ ไม่มีคุณค่าอิสระเมื่อพ่อแม่หายไปแล้ว จึงลบตามไปได้เลย
     await addForeignKeyIfNotExists(
       c,
@@ -590,7 +588,7 @@ async function ensureEquipmentHistoryTable(client?: PoolClient) {
 }
 
 // ตรวจและสร้างตาราง app_settings สำหรับเก็บค่า Settings ของระบบ
-async function ensureSettingsTable(client?: PoolClient) {
+async function ensureSettingsTableDdl(client?: PoolClient) {
   const c = client ?? (await pool.connect());
   try {
     await c.query(`
@@ -605,17 +603,51 @@ async function ensureSettingsTable(client?: PoolClient) {
   }
 }
 
-// เรียก ensure ทุกตาราง ใช้เมื่อต้องการเตรียม database ให้พร้อมก่อนใช้งาน
-async function ensureTables(client?: PoolClient) {
-  await ensureNotificationsTable(client);
-  await ensureEventsTable(client);
-  await ensureStockTable(client);
-  await ensureStockHistoryTable(client);
-  await ensureStockReceiptsTable(client);
-  await ensureDamageItemsTable(client);
-  await ensureEquipmentHistoryTable(client);
-  await ensureSettingsTable(client);
+// สร้าง/อัปเดต schema ทุกตาราง "ครั้งเดียวต่อ process" แล้วจำผลไว้
+// เดิม ensure*Table รัน CREATE/ALTER TABLE ทุกครั้งที่มี query — ALTER TABLE ขอ lock แบบ exclusive แม้คอลัมน์มีอยู่แล้ว
+// พอหลาย request เข้ามาพร้อมกัน (โดยเฉพาะตอน process เพิ่งเริ่ม) จึง deadlock กันจน API ตอบ 500
+// advisory lock กันหลาย process (เช่น dev server หลาย worker) รัน DDL ชุดนี้ซ้อนกัน
+const SCHEMA_LOCK_KEY = 724100500;
+let schemaReady: Promise<void> | null = null;
+
+function ensureSchema(): Promise<void> {
+  schemaReady ??= (async () => {
+    const c = await schemaPool.connect();
+    try {
+      await c.query("SELECT pg_advisory_lock($1)", [SCHEMA_LOCK_KEY]);
+      try {
+        await ensureNotificationsTableDdl(c);
+        await ensureEventsTableDdl(c); // รวม ensureAuthTables (FK events.created_by → users)
+        await ensureStockTableDdl(c);
+        await ensureStockHistoryTableDdl(c);
+        await ensureStockReceiptsTableDdl(c);
+        await ensureDamageItemsTableDdl(c);
+        await ensureEquipmentHistoryTableDdl(c);
+        await ensureSettingsTableDdl(c);
+      } finally {
+        await c.query("SELECT pg_advisory_unlock($1)", [SCHEMA_LOCK_KEY]).catch(() => undefined);
+      }
+    } finally {
+      c.release();
+    }
+  })().catch((err) => {
+    schemaReady = null; // ล้มแล้วให้ request ถัดไปลองใหม่
+    throw err;
+  });
+  return schemaReady;
 }
+
+// ชื่อเดิมที่ฟังก์ชันอื่นในไฟล์เรียกอยู่ — ทุกตัวแค่รอ schema พร้อม (ผู้เรียกยังส่ง client มาได้ แต่ไม่ใช้แล้ว)
+type EnsureFn = (client?: PoolClient) => Promise<void>;
+const ensureNotificationsTable: EnsureFn = ensureSchema;
+const ensureEventsTable: EnsureFn = ensureSchema;
+const ensureStockTable: EnsureFn = ensureSchema;
+const ensureStockHistoryTable: EnsureFn = ensureSchema;
+const ensureStockReceiptsTable: EnsureFn = ensureSchema;
+const ensureDamageItemsTable: EnsureFn = ensureSchema;
+const ensureEquipmentHistoryTable: EnsureFn = ensureSchema;
+const ensureSettingsTable: EnsureFn = ensureSchema;
+const ensureTables: EnsureFn = ensureSchema;
 
 // เพิ่ม notification ใหม่พร้อมกำหนด audience และรายชื่อ role ที่ยังไม่ได้อ่าน
 export async function insertNotification(payload: {
@@ -1224,8 +1256,10 @@ async function insertStockHistory(
   );
 }
 
-// items = แถวที่เพิ่ม/แก้ (upsert), deletedIds = แถวที่ลบ — แถวอื่นในตารางไม่ถูกแตะ
-export async function upsertStockItems(items: StockItemInput[], deletedIds: string[] = []) {
+// items = แถวที่เพิ่ม/แก้ (upsert), deletedIds = แถวที่ลบ, createdIds = id ที่ต้องเป็นแถวใหม่เท่านั้น
+// แถวอื่นในตารางไม่ถูกแตะ — ถ้า id ใน createdIds มีอยู่แล้ว (มีคนเพิ่มรหัสเดียวกันไปก่อน แม้แค่เสี้ยววินาที)
+// จะ rollback ทั้งชุดแล้ว throw error ที่มี code = "STOCK_ID_TAKEN" แทนการเขียนทับของเขา
+export async function upsertStockItems(items: StockItemInput[], deletedIds: string[] = [], createdIds: string[] = []) {
   const client = await pool.connect();
   try {
     await ensureStockTable(client);
@@ -1239,7 +1273,23 @@ export async function upsertStockItems(items: StockItemInput[], deletedIds: stri
     const prevById = new Map(prevRes.rows.map(r => [r.id, r]));
 
     // Upsert each item — ON CONFLICT preserves the original created_at
+    const mustBeNew = new Set(createdIds);
     for (const item of items) {
+      if (mustBeNew.has(item.id)) {
+        // เช็คและเขียนในคำสั่งเดียวกัน (atomic) — ไม่มีช่องว่างระหว่าง "เช็คว่าว่าง" กับ "เขียน" ให้ request อื่นแทรก
+        const inserted = await client.query(
+          `INSERT INTO stock_items (id, code, name, brand, category, system, zone, warehouse_address, status, qty, available, price_per_day, cost, repairing)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+           ON CONFLICT (id) DO NOTHING
+           RETURNING id`,
+          [item.id, item.code, item.name, item.brand, item.category, item.system,
+           item.zone, item.warehouseAddress ?? "", item.status, item.qty, item.available, item.pricePerDay, item.cost, item.repairing]
+        );
+        if (inserted.rowCount === 0) {
+          throw Object.assign(new Error(`stock id ${item.id} already exists`), { code: "STOCK_ID_TAKEN", takenId: item.id });
+        }
+        continue;
+      }
       await client.query(
         `INSERT INTO stock_items (id, code, name, brand, category, system, zone, warehouse_address, status, qty, available, price_per_day, cost, repairing)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
