@@ -7,8 +7,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // ไม่รวมไฟล์ static ของ Next (ต้องคง cache ยาวเดิมไว้)
-        source: "/((?!_next/static|_next/image).*)",
+        // เฉพาะหน้า HTML (Cloudflare แก้แค่ HTML) — ไม่รวมไฟล์ static ของ Next (ต้องคง cache ยาวเดิม)
+        // และ /api, /uploads ที่ route ตั้ง Cache-Control ของตัวเอง (เช่นไฟล์แนบ private, no-store)
+        source: "/((?!_next/static|_next/image|api/|uploads/).*)",
         headers: [{ key: "Cache-Control", value: "private, no-cache, no-store, max-age=0, must-revalidate, no-transform" }],
       },
     ];
