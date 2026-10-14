@@ -1,17 +1,13 @@
 "use server";
 
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { insertDamageItems, listDamageItems } from "@/lib/db";
 import { containsNullByte } from "@/lib/sanitize";
 import { requireUser } from "@/lib/auth";
-import { extensionForMime, uploadDir, uploadUrl } from "@/lib/uploads";
+import { extensionForMime, saveUpload, uploadUrl } from "@/lib/uploads";
 
 const MAX_PHOTO_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_PHOTO_MIME_TYPES = ["image/jpeg", "image/png"];
-// เก็บนอก public/ — เสิร์ฟผ่าน app/uploads/[kind]/[name]/route.ts ที่เช็คสิทธิ์
-const DAMAGE_UPLOAD_DIR = uploadDir("damage");
 
 // ดึง breakdown ความเสียหายรายชิ้นทั้งหมด ใช้แสดงในหน้ารายงาน > ความเสียหาย
 export async function GET() {
@@ -102,10 +98,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (photoFiles.length > 0) {
-    await mkdir(DAMAGE_UPLOAD_DIR, { recursive: true });
-  }
-
   const photoPathsByItem: string[][] = [];
   let cursor = 0;
   let globalIndex = 0;
@@ -117,7 +109,8 @@ export async function POST(req: NextRequest) {
       const storedFileName = `${eventId}-${globalIndex}-${Date.now()}${extensionForMime(file.type)}`;
       globalIndex++;
       const buffer = Buffer.from(await file.arrayBuffer());
-      await writeFile(path.join(DAMAGE_UPLOAD_DIR, storedFileName), buffer);
+      // เก็บนอก public/ (ดิสก์หรือ Vercel Blob) — เสิร์ฟผ่าน app/uploads/[kind]/[name]/route.ts ที่เช็คสิทธิ์
+      await saveUpload("damage", storedFileName, buffer, file.type);
       paths.push(uploadUrl("damage", storedFileName));
     }
     photoPathsByItem.push(paths);

@@ -607,6 +607,8 @@ async function ensureSettingsTableDdl(client?: PoolClient) {
 // เดิม ensure*Table รัน CREATE/ALTER TABLE ทุกครั้งที่มี query — ALTER TABLE ขอ lock แบบ exclusive แม้คอลัมน์มีอยู่แล้ว
 // พอหลาย request เข้ามาพร้อมกัน (โดยเฉพาะตอน process เพิ่งเริ่ม) จึง deadlock กันจน API ตอบ 500
 // advisory lock กันหลาย process (เช่น dev server หลาย worker) รัน DDL ชุดนี้ซ้อนกัน
+// ใช้ lock ระดับ transaction (pg_advisory_xact_lock) และรัน DDL ทั้งชุดใน transaction เดียว
+// เพราะบน Neon แบบ pooled (PgBouncer โหมด transaction) lock ระดับ session อาจ lock/unlock คนละ connection แล้วค้างถาวร
 const SCHEMA_LOCK_KEY = 724100500;
 let schemaReady: Promise<void> | null = null;
 
@@ -614,8 +616,9 @@ function ensureSchema(): Promise<void> {
   schemaReady ??= (async () => {
     const c = await schemaPool.connect();
     try {
-      await c.query("SELECT pg_advisory_lock($1)", [SCHEMA_LOCK_KEY]);
+      await c.query("BEGIN");
       try {
+        await c.query("SELECT pg_advisory_xact_lock($1)", [SCHEMA_LOCK_KEY]);
         await ensureNotificationsTableDdl(c);
         await ensureEventsTableDdl(c); // รวม ensureAuthTables (FK events.created_by → users)
         await ensureStockTableDdl(c);
@@ -624,8 +627,10 @@ function ensureSchema(): Promise<void> {
         await ensureDamageItemsTableDdl(c);
         await ensureEquipmentHistoryTableDdl(c);
         await ensureSettingsTableDdl(c);
-      } finally {
-        await c.query("SELECT pg_advisory_unlock($1)", [SCHEMA_LOCK_KEY]).catch(() => undefined);
+        await c.query("COMMIT");
+      } catch (err) {
+        await c.query("ROLLBACK").catch(() => undefined);
+        throw err;
       }
     } finally {
       c.release();

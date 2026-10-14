@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { getEventByReceiptPath } from "@/lib/db";
-import { contentTypeFor, resolveUploadFile, uploadUrl } from "@/lib/uploads";
+import { contentTypeFor, readUpload, resolveUploadFile, uploadUrl } from "@/lib/uploads";
 
 const notFound = () => NextResponse.json({ error: "not found" }, { status: 404 });
 
@@ -25,12 +24,8 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ kind: 
     if (!event || event.created_by !== user.id) return notFound();
   }
 
-  let data: Buffer;
-  try {
-    data = await readFile(resolved.filePath);
-  } catch {
-    return notFound();
-  }
+  const data = await readUpload(resolved.kind, name);
+  if (!data) return notFound();
 
   // นามสกุลที่ไม่อยู่ใน whitelist ให้ดาวน์โหลดเป็นไฟล์ ไม่ให้เบราว์เซอร์เปิด/รัน (กัน HTML/SVG ที่อัปโหลดมาก่อนหน้านี้)
   const contentType = contentTypeFor(name);

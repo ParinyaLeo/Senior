@@ -1,4 +1,6 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { get, put } from "@vercel/blob";
 
 // ไฟล์ที่ผู้ใช้อัปโหลด (สลิป, รูปความเสียหาย) เก็บนอก public/ เพื่อไม่ให้ใครเปิดได้โดยไม่ผ่านการเช็คสิทธิ์
 // เสิร์ฟผ่าน app/uploads/[kind]/[name]/route.ts ที่ URL เดิม (/uploads/<kind>/<name>) จึงไม่ต้องแก้ path ที่เก็บใน DB
@@ -47,4 +49,30 @@ export function resolveUploadFile(kind: string, name: string): { kind: UploadKin
   if (!(UPLOAD_KINDS as readonly string[]).includes(kind)) return null;
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) || name.includes("..")) return null;
   return { kind: kind as UploadKind, filePath: path.join(UPLOAD_ROOT, kind, name) };
+}
+
+// บน Vercel ดิสก์เขียนถาวรไม่ได้ → ถ้ามี token ของ Vercel Blob ให้เก็บไฟล์ใน Blob store แบบ private
+// (เปิดตรงจาก URL ของ Blob ไม่ได้ ต้องผ่าน app/uploads/[kind]/[name]/route.ts ที่เช็คสิทธิ์เหมือนเดิม)
+// ไม่มี token (รันในเครื่อง) → เก็บลงดิสก์ที่ UPLOAD_ROOT แบบเดิม
+function blobStorageEnabled() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
+export async function saveUpload(kind: UploadKind, fileName: string, data: Buffer, contentType: string) {
+  if (blobStorageEnabled()) {
+    await put(`${kind}/${fileName}`, data, { access: "private", contentType, addRandomSuffix: false });
+    return;
+  }
+  await mkdir(uploadDir(kind), { recursive: true });
+  await writeFile(path.join(uploadDir(kind), fileName), data);
+}
+
+// คืน null ถ้าไม่พบไฟล์
+export async function readUpload(kind: UploadKind, fileName: string): Promise<Buffer | null> {
+  if (blobStorageEnabled()) {
+    const result = await get(`${kind}/${fileName}`, { access: "private" }).catch(() => null);
+    if (!result || result.statusCode !== 200) return null;
+    return Buffer.from(await new Response(result.stream).arrayBuffer());
+  }
+  return readFile(path.join(uploadDir(kind), fileName)).catch(() => null);
 }
